@@ -1,1 +1,417 @@
-<?php echo "Wi-Fi Vaquejada - Servidor Online!"; ?>
+<?php
+require __DIR__ . '/config.php';
+
+/** Monta um link de WhatsApp com mensagem pré-preenchida. */
+function whats_link($numero, $msg) {
+    return 'https://wa.me/' . preg_replace('/[^0-9]/', '', $numero) . '?text=' . rawurlencode($msg);
+}
+
+$whatsPadrao = whats_link($AGENCIA['whatsapp'], $WHATS_MSG_PADRAO);
+$anoAtual    = $AGENCIA['ano'];
+?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a1014">
+    <title><?= htmlspecialchars($AGENCIA['nome']) ?> — <?= htmlspecialchars($AGENCIA['slogan']) ?></title>
+    <meta name="description" content="<?= htmlspecialchars($AGENCIA['descricao']) ?>">
+
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="<?= htmlspecialchars($AGENCIA['nome']) ?> — <?= htmlspecialchars($AGENCIA['slogan']) ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($AGENCIA['descricao']) ?>">
+    <meta property="og:locale" content="pt_BR">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%2325d366'/><text x='50' y='68' font-size='58' text-anchor='middle' fill='%23062018' font-family='Arial' font-weight='bold'>C</text></svg>">
+</head>
+<body data-whatsapp="<?= htmlspecialchars($whatsPadrao) ?>">
+
+<!-- ===================== HEADER ===================== -->
+<header class="site-header" id="topo">
+    <div class="container header__inner">
+        <a class="brand" href="#topo" aria-label="<?= htmlspecialchars($AGENCIA['nome']) ?>">
+            <span class="brand__mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                </svg>
+            </span>
+            <span class="brand__text">
+                <strong><?= htmlspecialchars($AGENCIA['marca']) ?></strong>
+                <small>Agência de IA</small>
+            </span>
+        </a>
+
+        <nav class="nav" id="nav" aria-label="Navegação principal">
+            <a href="#recursos">Recursos</a>
+            <a href="#como-funciona">Como funciona</a>
+            <a href="#planos">Planos</a>
+            <a href="#depoimentos">Depoimentos</a>
+            <a href="#perguntas">Perguntas</a>
+        </nav>
+
+        <div class="header__actions">
+            <a class="btn btn--ghost btn--sm" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Falar no WhatsApp</a>
+            <a class="btn btn--primary btn--sm" href="#planos" data-scroll>Testar grátis</a>
+        </div>
+
+        <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false" aria-controls="nav">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+</header>
+
+<main>
+
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+    <div class="hero__glow" aria-hidden="true"></div>
+    <div class="container hero__grid">
+        <div class="hero__copy">
+            <span class="pill">
+                <span class="pill__dot"></span>
+                Agente de IA aprovado para WhatsApp Business
+            </span>
+            <h1 class="hero__title">
+                Seu atendimento no WhatsApp trabalhando <span class="grad">24 horas por dia</span>, sem parar.
+            </h1>
+            <p class="hero__lead">
+                A <?= htmlspecialchars($AGENCIA['nome']) ?> instala um Agente de Inteligência Artificial que
+                responde, qualifica leads, agenda reuniões e vende no seu WhatsApp — com a naturalidade de um
+                atendente humano e a velocidade de uma máquina.
+            </p>
+
+            <div class="hero__cta">
+                <a class="btn btn--primary btn--lg" href="#planos" data-scroll>
+                    Começar teste grátis
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+                <a class="btn btn--outline btn--lg" href="#como-funciona" data-scroll>Ver como funciona</a>
+            </div>
+
+            <ul class="hero__stats">
+                <li><strong>24/7</strong><span>disponível todo dia</span></li>
+                <li><strong>&lt; 3s</strong><span>tempo de resposta</span></li>
+                <li><strong>+3x</strong><span>mais leads atendidos</span></li>
+            </ul>
+        </div>
+
+        <div class="hero__demo" aria-hidden="true">
+            <div class="phone">
+                <div class="phone__notch"></div>
+                <div class="phone__topbar">
+                    <span class="phone__avatar">C</span>
+                    <div class="phone__peer">
+                        <strong>Agente Cavalcante</strong>
+                        <small><span class="dot-online"></span> online agora</small>
+                    </div>
+                </div>
+                <div class="phone__chat" id="chatDemo"></div>
+            </div>
+            <div class="hero__badge hero__badge--1">Lead qualificado ✓</div>
+            <div class="hero__badge hero__badge--2">Reunião agendada 📅</div>
+        </div>
+    </div>
+
+    <div class="marquee" aria-hidden="true">
+        <div class="marquee__track">
+            <span>Atendimento 24h</span><span>•</span>
+            <span>Qualificação de leads</span><span>•</span>
+            <span>Respostas em áudio</span><span>•</span>
+            <span>Agendamento automático</span><span>•</span>
+            <span>Follow-up inteligente</span><span>•</span>
+            <span>Integrações</span><span>•</span>
+            <span>Pipeline de vendas</span><span>•</span>
+            <span>Atendimento 24h</span><span>•</span>
+            <span>Qualificação de leads</span><span>•</span>
+            <span>Respostas em áudio</span><span>•</span>
+            <span>Agendamento automático</span><span>•</span>
+            <span>Follow-up inteligente</span><span>•</span>
+            <span>Integrações</span><span>•</span>
+            <span>Pipeline de vendas</span><span>•</span>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== PROBLEMA / VALOR ===================== -->
+<section class="section value">
+    <div class="container">
+        <div class="section__head">
+            <span class="eyebrow">Por que sua empresa precisa disso</span>
+            <h2>Cada mensagem sem resposta é uma venda que vai para o concorrente.</h2>
+            <p>O cliente do WhatsApp não espera. Se ninguém responde em minutos, ele fecha com quem respondeu primeiro. O Agente de IA da Cavalcante garante que <strong>nenhuma conversa fique parada</strong> — de dia, de noite, no fim de semana e no feriado.</p>
+        </div>
+        <div class="value__grid">
+            <div class="value__card">
+                <span class="value__num">73%</span>
+                <p>dos clientes escolhem a empresa que responde primeiro no WhatsApp.</p>
+            </div>
+            <div class="value__card">
+                <span class="value__num">−40%</span>
+                <p>de leads perdidos por demora ou atendimento fora do horário comercial.</p>
+            </div>
+            <div class="value__card">
+                <span class="value__num">100%</span>
+                <p>das mensagens respondidas na hora, mesmo em picos de volume.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== RECURSOS ===================== -->
+<section class="section" id="recursos">
+    <div class="container">
+        <div class="section__head">
+            <span class="eyebrow">Recursos</span>
+            <h2>Um atendente de IA completo dentro do seu WhatsApp</h2>
+            <p>Muito além de um chatbot de perguntas prontas: o agente entende o contexto, aprende com o seu negócio e conduz a conversa até a venda.</p>
+        </div>
+
+        <div class="features">
+            <?php
+            $features = [
+                ['🤖', 'Conversa como gente', 'Entende linguagem natural, áudios e imagens — responde no tom da sua marca, sem parecer robô.'],
+                ['🕐', 'Atendimento 24/7', 'Responde na mesma hora, todos os dias, sem folga, sem fila e sem cliente esperando.'],
+                ['🎯', 'Qualifica leads', 'Faz as perguntas certas, separa curioso de comprador e entrega só o lead pronto para o time.'],
+                ['🎙️', 'Voz humana', 'Envia áudios com voz natural quando faz sentido, deixando a conversa mais próxima.'],
+                ['📅', 'Agenda reuniões', 'Marca calls e visitas direto na sua agenda, com lembrete automático para o cliente.'],
+                ['🔁', 'Follow-up automático', 'Reengaja quem sumiu com cadências inteligentes e recupera vendas que iriam esfriar.'],
+                ['🔌', 'Integrações', 'Conecta com seu CRM, planilhas, ERP e sistemas via API para buscar e registrar dados.'],
+                ['📊', 'Pipeline de vendas', 'Um funil visual mostra quem entrou, quem está sendo trabalhado e o que está pronto para fechar.'],
+                ['🙋', 'Passa para humano', 'Quando a conversa exige cuidado, transfere para um atendente da sua equipe sem ruído.'],
+            ];
+            foreach ($features as $f): ?>
+            <article class="feature">
+                <span class="feature__icon" aria-hidden="true"><?= $f[0] ?></span>
+                <h3><?= htmlspecialchars($f[1]) ?></h3>
+                <p><?= htmlspecialchars($f[2]) ?></p>
+            </article>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== COMO FUNCIONA ===================== -->
+<section class="section section--alt" id="como-funciona">
+    <div class="container">
+        <div class="section__head">
+            <span class="eyebrow">Como funciona</span>
+            <h2>Do primeiro contato à venda em 4 passos</h2>
+            <p>Você cuida do seu negócio. A gente cuida da tecnologia e da implantação.</p>
+        </div>
+
+        <ol class="steps">
+            <li class="step">
+                <span class="step__num">1</span>
+                <h3>Diagnóstico</h3>
+                <p>Entendemos seu produto, suas perguntas frequentes e o jeito da sua empresa atender.</p>
+            </li>
+            <li class="step">
+                <span class="step__num">2</span>
+                <h3>Treinamento do agente</h3>
+                <p>Configuramos a IA com o conhecimento do seu negócio e conectamos ao seu WhatsApp.</p>
+            </li>
+            <li class="step">
+                <span class="step__num">3</span>
+                <h3>Testes e ajustes</h3>
+                <p>Rodamos conversas reais, refinamos o tom e as regras até ficar do seu jeito.</p>
+            </li>
+            <li class="step">
+                <span class="step__num">4</span>
+                <h3>No ar, vendendo</h3>
+                <p>O agente entra em operação e você acompanha tudo pelo painel e pelo pipeline.</p>
+            </li>
+        </ol>
+    </div>
+</section>
+
+<!-- ===================== PLANOS ===================== -->
+<section class="section" id="planos">
+    <div class="container">
+        <div class="section__head">
+            <span class="eyebrow">Planos</span>
+            <h2>Escolha o plano e comece hoje</h2>
+            <p>Todos os planos incluem implantação assistida e teste grátis. Cancele quando quiser.</p>
+        </div>
+
+        <div class="plans">
+            <?php foreach ($PLANOS as $p): ?>
+            <article class="plan <?= $p['destaque'] ? 'plan--featured' : '' ?>">
+                <?php if ($p['destaque']): ?><span class="plan__tag">Mais escolhido</span><?php endif; ?>
+                <header class="plan__head">
+                    <h3 class="plan__name"><?= htmlspecialchars($p['nome']) ?></h3>
+                    <p class="plan__summary"><?= htmlspecialchars($p['resumo']) ?></p>
+                    <div class="plan__price">
+                        <span class="plan__currency">R$</span>
+                        <span class="plan__value"><?= number_format($p['preco'], 0, ',', '.') ?></span>
+                        <span class="plan__period"><?= htmlspecialchars($p['periodo']) ?></span>
+                    </div>
+                    <span class="plan__billing"><?= htmlspecialchars($p['cobranca']) ?></span>
+                    <span class="plan__credits"><?= htmlspecialchars($p['creditos']) ?></span>
+                </header>
+
+                <ul class="plan__features">
+                    <?php foreach ($p['recursos'] as $r): ?>
+                    <li class="<?= $r['incluso'] ? 'is-in' : 'is-out' ?>">
+                        <?php if ($r['incluso']): ?>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                        <?php else: ?>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        <?php endif; ?>
+                        <span><?= htmlspecialchars($r['texto']) ?></span>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+
+                <div class="plan__actions">
+                    <button class="btn btn--primary btn--block js-assinar" data-plano="<?= (int) $p['plano'] ?>" data-nome="<?= htmlspecialchars($p['nome']) ?>">
+                        <?= htmlspecialchars($p['cta']) ?>
+                    </button>
+                    <button class="btn btn--outline btn--block js-trial" data-plano="<?= (int) $p['plano'] ?>" data-nome="<?= htmlspecialchars($p['nome']) ?>">
+                        Testar grátis
+                    </button>
+                </div>
+            </article>
+            <?php endforeach; ?>
+        </div>
+
+        <p class="plans__note">
+            Precisa de um volume maior ou um projeto sob medida?
+            <a href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Fale com a nossa equipe</a>.
+        </p>
+    </div>
+</section>
+
+<!-- ===================== DEPOIMENTOS ===================== -->
+<section class="section section--alt" id="depoimentos">
+    <div class="container">
+        <div class="section__head">
+            <span class="eyebrow">Depoimentos</span>
+            <h2>Quem já atende com IA não volta atrás</h2>
+        </div>
+        <div class="testimonials">
+            <?php
+            $depoimentos = [
+                ['O agente responde melhor e mais rápido do que a gente conseguia manualmente. Paramos de perder cliente à noite.', 'Marina Alves', 'Clínica de Estética'],
+                ['Em duas semanas o funil encheu de lead qualificado. A equipe só entra quando o cliente já está quente.', 'Rafael Nunes', 'Imobiliária'],
+                ['Instalação rápida e suporte de verdade. Hoje o WhatsApp virou nosso melhor vendedor.', 'Camila Torres', 'Loja de Móveis'],
+            ];
+            foreach ($depoimentos as $d): ?>
+            <figure class="testimonial">
+                <div class="testimonial__stars" aria-label="5 de 5 estrelas">★★★★★</div>
+                <blockquote>“<?= htmlspecialchars($d[0]) ?>”</blockquote>
+                <figcaption>
+                    <span class="testimonial__avatar" aria-hidden="true"><?= mb_substr($d[1], 0, 1) ?></span>
+                    <span>
+                        <strong><?= htmlspecialchars($d[1]) ?></strong>
+                        <small><?= htmlspecialchars($d[2]) ?></small>
+                    </span>
+                </figcaption>
+            </figure>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== PERGUNTAS (FAQ) ===================== -->
+<section class="section" id="perguntas">
+    <div class="container container--narrow">
+        <div class="section__head">
+            <span class="eyebrow">Perguntas frequentes</span>
+            <h2>Ficou com alguma dúvida?</h2>
+        </div>
+
+        <div class="faq">
+            <?php
+            $faqs = [
+                ['O agente funciona no meu número atual de WhatsApp?', 'Sim. Conectamos o agente ao número da sua empresa de forma segura, seguindo as diretrizes do WhatsApp Business. Você continua com o mesmo número que seus clientes já conhecem.'],
+                ['A IA responde como um robô?', 'Não. O agente entende contexto, interpreta áudios e imagens e conversa no tom da sua marca. Na maioria das vezes o cliente nem percebe que está falando com uma IA.'],
+                ['Consigo assumir a conversa quando quiser?', 'Sim. A qualquer momento um atendente humano pode entrar na conversa pelo painel, e o agente também transfere sozinho quando o caso é mais delicado.'],
+                ['O que são os créditos de IA?', 'São a medida de uso do agente (mensagens, áudios e ações inteligentes). Cada plano inclui uma quantidade trimestral, e você pode subir de plano a qualquer momento.'],
+                ['Preciso saber de tecnologia para usar?', 'Não. A Agência Cavalcante cuida de toda a implantação, do treinamento do agente e dos ajustes. Você acompanha os resultados por um painel simples.'],
+                ['Posso testar antes de assinar?', 'Pode. Todos os planos têm teste grátis. Clique em “Testar grátis” no plano desejado e comece agora mesmo.'],
+            ];
+            foreach ($faqs as $i => $q): ?>
+            <details class="faq__item"<?= $i === 0 ? ' open' : '' ?>>
+                <summary>
+                    <span><?= htmlspecialchars($q[0]) ?></span>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                </summary>
+                <div class="faq__answer"><p><?= htmlspecialchars($q[1]) ?></p></div>
+            </details>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== CTA FINAL ===================== -->
+<section class="section">
+    <div class="container">
+        <div class="cta-final">
+            <div class="cta-final__glow" aria-hidden="true"></div>
+            <h2>Pronto para nunca mais perder um cliente no WhatsApp?</h2>
+            <p>Coloque o Agente de IA da Cavalcante para trabalhar hoje e veja seu atendimento virar máquina de vendas.</p>
+            <div class="cta-final__actions">
+                <a class="btn btn--primary btn--lg" href="#planos" data-scroll>Escolher meu plano</a>
+                <a class="btn btn--outline btn--lg" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Falar com um especialista</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+</main>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="site-footer">
+    <div class="container footer__grid">
+        <div class="footer__brand">
+            <a class="brand" href="#topo">
+                <span class="brand__mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                </span>
+                <span class="brand__text"><strong><?= htmlspecialchars($AGENCIA['marca']) ?></strong><small>Agência de IA</small></span>
+            </a>
+            <p><?= htmlspecialchars($AGENCIA['descricao']) ?></p>
+        </div>
+
+        <nav class="footer__col" aria-label="Navegação do rodapé">
+            <h4>Navegação</h4>
+            <a href="#recursos">Recursos</a>
+            <a href="#como-funciona">Como funciona</a>
+            <a href="#planos">Planos</a>
+            <a href="#perguntas">Perguntas</a>
+        </nav>
+
+        <div class="footer__col">
+            <h4>Contato</h4>
+            <a href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="mailto:<?= htmlspecialchars($AGENCIA['email']) ?>"><?= htmlspecialchars($AGENCIA['email']) ?></a>
+            <a href="<?= htmlspecialchars($AGENCIA['instagram']) ?>" target="_blank" rel="noopener">Instagram</a>
+        </div>
+    </div>
+    <div class="container footer__bottom">
+        <span>© <?= $anoAtual ?> <?= htmlspecialchars($AGENCIA['nome']) ?>. Todos os direitos reservados.</span>
+        <span>Feito para vender no WhatsApp.</span>
+    </div>
+</footer>
+
+<!-- Botão flutuante do WhatsApp -->
+<a class="wa-float" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+    <svg viewBox="0 0 32 32" width="30" height="30" fill="currentColor" aria-hidden="true"><path d="M16 3C9 3 3.4 8.6 3.4 15.6c0 2.5.7 4.9 2 7L3 29l6.6-2.3c2 .9 4.1 1.4 6.4 1.4 7 0 12.6-5.6 12.6-12.6C28.6 8.6 23 3 16 3zm0 22.9c-2 0-3.9-.5-5.6-1.5l-.4-.2-3.9 1.4 1.3-3.8-.3-.4a10.3 10.3 0 0 1-1.6-5.5C5.5 9.9 10.2 5.3 16 5.3S26.5 9.9 26.5 15.6 21.8 25.9 16 25.9zm5.9-7.7c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.3-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.3.4-.6.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.2-1.2 2.9s1.2 3.4 1.4 3.6c.2.2 2.4 3.7 5.8 5.1.8.3 1.5.6 2 .7.8.3 1.6.2 2.2.1.7-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg>
+</a>
+
+<!-- Toast de feedback -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+window.AGENCIA = {
+    whatsapp: <?= json_encode($whatsPadrao, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>
+};
+</script>
+<script src="assets/js/app.js" defer></script>
+</body>
+</html>
