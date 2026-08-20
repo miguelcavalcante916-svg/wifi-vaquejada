@@ -33,13 +33,17 @@ if ($erro !== '' || $body === false) {
     exit;
 }
 
-if (is_string($body) && json_decode($body) !== null) {
-    http_response_code($code >= 200 && $code < 600 ? $code : 200);
-    echo $body;
-    exit;
+if (is_string($body) && $body !== '') {
+    json_decode($body);
+    if (json_last_error() === JSON_ERROR_NONE) {
+        http_response_code($code >= 200 && $code < 600 ? $code : 200);
+        echo $body;
+        exit;
+    }
 }
 
+http_response_code($code >= 200 && $code < 600 ? $code : 200);
 echo json_encode([
     'ok'    => $code >= 200 && $code < 300,
     'dados' => $body,
-], JSON_UNESCAPED_UNICODE);
+], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);

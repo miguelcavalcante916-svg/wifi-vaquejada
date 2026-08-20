@@ -1,46 +1,68 @@
-# Agência Cavalcante — Agentes de IA no WhatsApp
+# Agência Cavalcante — Agente de IA no WhatsApp
 
-Sistema de site/landing page para a **Agência Cavalcante**, que oferece um
-**Agente de Inteligência Artificial para WhatsApp**: atendimento 24h,
-qualificação de leads, agendamento, follow-up e checkout de planos.
+Site de vendas (landing page) + endpoints de checkout para o serviço de
+**Agente de IA no WhatsApp** da Agência Cavalcante: atendimento automático 24h,
+qualificação de leads, agendamento, follow-up e pipeline de vendas.
 
-O front-end (PHP + HTML/CSS/JS) exibe a página de vendas e dispara os fluxos de
-**teste grátis** e **assinatura**, que são repassados para um backend ("ponte").
+O sistema é feito em **PHP puro** (sem framework) e conversa com um backend
+próprio (a "ponte") que gera os trials e os links de pagamento.
+
+> **Sobre a inspiração:** o conceito (agente de IA para WhatsApp, com planos por
+> créditos, trial e voucher) é comum no mercado. Todo o design, textos e código
+> deste repositório são **originais** — não é uma cópia de nenhum site de
+> terceiros.
+
+---
 
 ## Estrutura
 
 ```
 .
-├── index.php            # Landing page (renderiza planos e dados a partir do config)
-├── config.php           # Configuração central: agência, ponte (backend) e planos
-├── trial.php            # Inicia teste grátis (proxy -> ponte/trial)
-├── voucher.php          # Gera link de checkout (proxy -> ponte/voucher)
-├── status.php           # Health-check em JSON
+├── index.php          # Landing page (hero, recursos, planos, FAQ, etc.)
+├── config.php         # Configuração central: agência, PONTE_URL, planos
+├── trial.php          # Endpoint: inicia teste grátis (proxy p/ a ponte)
+├── voucher.php        # Endpoint: gera link de checkout de um plano
+├── status.php         # Healthcheck simples (GET /status.php → JSON)
+├── composer.json      # Requisito de versão do PHP
 └── assets/
-    ├── css/style.css    # Design system (tema escuro, acento verde WhatsApp)
-    └── js/app.js        # Interatividade, chat animado e wiring do checkout
+    ├── css/style.css  # Design system (tema escuro, verde/teal, responsivo)
+    └── js/app.js      # Interatividade + integração de checkout
 ```
-
-## Configuração
-
-Edite `config.php`:
-
-- **`PONTE_URL`** — endereço do backend que gera trials e checkout. Pode ser
-  definido pela variável de ambiente `PONTE_URL` no servidor.
-- **`$AGENCIA`** — nome, WhatsApp (`DDI+DDD+numero`, só dígitos), e-mail,
-  Instagram etc.
-- **`$PLANOS`** — nome, preço, créditos e recursos de cada plano. O campo
-  `plano` é o identificador enviado ao backend (`voucher.php?plano=N`).
 
 ## Como funciona o checkout
 
-1. O visitante clica em **Assinar** (`.js-assinar`) ou **Testar grátis**
-   (`.js-trial`) num plano.
-2. O JS chama `voucher.php?plano=N` ou `trial.php?plano=N`.
-3. Esses arquivos repassam a chamada para a `PONTE_URL` e devolvem a resposta.
-4. O JS procura uma URL de checkout na resposta (JSON ou texto) e redireciona.
-5. Se o backend não responder, o visitante é levado ao **WhatsApp** com uma
-   mensagem pré-preenchida (fallback resiliente).
+1. O visitante clica em **Assinar** ou **Testar grátis** em um plano.
+2. O `app.js` chama, respectivamente, `voucher.php?plano=N` ou `trial.php`.
+3. Esses endpoints repassam a chamada para a **ponte** (`PONTE_URL`) e devolvem
+   a resposta em JSON.
+4. O JS procura um link de checkout na resposta e **redireciona** o visitante.
+5. Se a ponte estiver fora do ar ou não devolver link, o JS mostra um aviso e
+   leva o visitante para o **WhatsApp** da agência (fallback), para não perder
+   o lead.
+
+Formato esperado da resposta da ponte (qualquer um destes serve):
+
+```json
+{ "checkout_url": "https://pagamento..." }
+{ "url": "https://pagamento..." }
+{ "ok": true, "link": "https://pagamento..." }
+```
+
+## Configuração (`config.php`)
+
+| O que ajustar | Onde |
+|---|---|
+| Backend que gera trial/checkout | `PONTE_URL` (ou variável de ambiente `PONTE_URL`) |
+| WhatsApp da agência | `$AGENCIA['whatsapp']` (DDI+DDD+número, só dígitos) |
+| E-mail e Instagram | `$AGENCIA['email']`, `$AGENCIA['instagram']` |
+| Preços, créditos e recursos dos planos | `$PLANOS[...]` |
+
+A `PONTE_URL` pode (e **deve**, em produção) vir de variável de ambiente:
+
+```bash
+# Apache (.htaccess ou vhost)
+SetEnv PONTE_URL "https://backend.agenciacavalcante.com.br"
+```
 
 ## Rodando localmente
 
@@ -49,9 +71,29 @@ php -S localhost:8000
 # abra http://localhost:8000
 ```
 
-Requisitos: PHP >= 7.4 com a extensão cURL habilitada.
+Requer **PHP 7.4+** com a extensão **cURL** habilitada.
 
 ---
 
-> Sistema original desenvolvido para a Agência Cavalcante. Inspirado no modelo
-> de negócio de agentes de IA para WhatsApp, com design, textos e código próprios.
+## ✅ Antes de publicar (checklist)
+
+Itens que dependem de dados reais da agência e precisam ser revistos antes de ir
+ao ar:
+
+- [ ] **WhatsApp real** em `config.php` (`$AGENCIA['whatsapp']`) — hoje está um
+      número de exemplo (`5511999999999`).
+- [ ] **Backend de produção** em `PONTE_URL` — o padrão atual é um túnel `ngrok`
+      de desenvolvimento e **vai cair**. Aponte para o domínio definitivo ou
+      defina a variável de ambiente `PONTE_URL`.
+- [ ] **E-mail e Instagram** conferidos e ativos (`config.php`).
+- [ ] **Preços e créditos** dos planos revisados (`$PLANOS`). O rótulo mostra o
+      valor mensal e o total trimestral cobrado — mantenha os dois coerentes.
+- [ ] **Depoimentos**: a seção "Exemplos de uso" é ilustrativa. Se quiser provas
+      sociais reais, substitua por depoimentos de clientes **com autorização**.
+- [ ] **Compartilhamento (SEO/redes)**: no `<head>` do `index.php` há um bloco
+      comentado — defina o domínio real e uma imagem `og:image` (1200×630) e o
+      `canonical`.
+- [ ] **Cidade/UF** em `config.php` (`$AGENCIA['cidade']`), se for usar.
+
+> Evite afirmações que não dá para comprovar (ex.: "aprovado/certificado pela
+> Meta", estatísticas sem fonte). Os textos atuais já foram ajustados para isso.

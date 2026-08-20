@@ -129,8 +129,12 @@
         setTimeout(step, 850);
       }
     }
-    // inicia quando o demo entra em tela (ou logo, se sem observer)
-    if ('IntersectionObserver' in window) {
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      // versão estática: mostra a conversa completa uma vez, sem loop de animação
+      script.forEach(function (item) { addBubble(item); });
+    } else if ('IntersectionObserver' in window) {
+      // inicia quando o demo entra em tela
       var started = false;
       var demoIo = new IntersectionObserver(function (entries) {
         if (entries[0].isIntersecting && !started) { started = true; step(); demoIo.disconnect(); }
@@ -148,9 +152,12 @@
   }
 
   /* ---------- Checkout / Trial ---------- */
-  var URL_KEYS = ['url', 'link', 'checkout', 'checkout_url', 'checkoutUrl', 'payment_url',
-    'paymentUrl', 'pay_url', 'invoice_url', 'invoiceUrl', 'href', 'redirect', 'redirect_url',
-    'pix', 'qrcode_url', 'init_point'];
+  // Chaves priorizadas: específicas de checkout primeiro, genéricas por último.
+  var URL_KEYS = ['checkout_url', 'checkoutUrl', 'checkout', 'payment_url', 'paymentUrl',
+    'pay_url', 'invoice_url', 'invoiceUrl', 'init_point', 'redirect_url', 'redirect',
+    'url', 'link'];
+  // Chaves que apontam para imagem/QR, nunca destino de navegação.
+  var SKIP_KEYS = /qr|image|img|logo|avatar|icon|photo|thumb/i;
 
   function looksLikeUrl(v) {
     return typeof v === 'string' && /^https?:\/\/\S+/i.test(v.trim());
@@ -168,9 +175,10 @@
       var val = data[URL_KEYS[k]];
       if (looksLikeUrl(val)) return val.trim();
     }
-    // varre demais valores
+    // varre demais valores, ignorando campos de imagem/QR
     for (var key in data) {
       if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+      if (SKIP_KEYS.test(key)) continue;
       var found = findUrl(data[key], depth + 1);
       if (found) return found;
     }
@@ -231,8 +239,9 @@
           ? 'O servidor demorou a responder. Vamos te levar ao WhatsApp.'
           : 'Não foi possível concluir agora. Continue pelo WhatsApp.';
         toast(msg, true);
+        // Navegação na mesma aba: não é bloqueada como popup fora do gesto do usuário.
         setTimeout(function () {
-          window.open(whatsFallback(nome, tipo), '_blank', 'noopener');
+          window.location.href = whatsFallback(nome, tipo);
         }, 900);
       })
       .then(function () {
