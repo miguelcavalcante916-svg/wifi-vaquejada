@@ -387,6 +387,7 @@ $anoAtual    = $AGENCIA['ano'];
             <a href="#como-funciona">Como funciona</a>
             <a href="#planos">Planos</a>
             <a href="#perguntas">Perguntas</a>
+            <a href="dashboard.php">Painel do cliente</a>
         </nav>
 
         <div class="footer__col">

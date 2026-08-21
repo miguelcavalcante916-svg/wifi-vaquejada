@@ -21,6 +21,9 @@ pagamento.
 .
 ├── index.php          # Landing page completa (hero com demo animada, recursos,
 │                      #   como funciona, PLANOS, exemplos de uso, FAQ, CTA, rodapé)
+├── dashboard.php      # PAINEL do cliente: visão geral (métricas + gráfico),
+│                      #   conversas, pipeline de vendas e chat com o Agente IA
+├── ia.php             # Endpoint do chat de IA (Anthropic API ou modo demo)
 ├── config.php         # Configuração central: agência, PONTE_URL e os 3 planos
 ├── trial.php          # Endpoint: inicia teste grátis (proxy p/ a ponte)
 ├── voucher.php        # Endpoint: gera link de checkout de um plano
@@ -28,7 +31,43 @@ pagamento.
 ├── composer.json      # Requisito de versão do PHP
 └── assets/
     ├── css/style.css  # Design system (azul #4361ee sobre #030409, responsivo)
-    └── js/app.js      # Menu, FAQ, demo animada + integração de checkout
+    ├── css/dash.css   # Estilos do painel (usa os tokens do style.css)
+    ├── js/app.js      # Menu, FAQ, demo animada + integração de checkout
+    └── js/dash.js     # Abas do painel + chat do Agente IA
+```
+
+## Painel do cliente (`dashboard.php`)
+
+Acessível em `/dashboard.php` (link no rodapé do site). Abas:
+
+- **Visão geral** — atendimentos do dia, leads qualificados, reuniões,
+  tempo de resposta, gráfico dos últimos 7 dias e consumo de créditos de IA.
+- **Conversas** — caixa de entrada estilo WhatsApp com etiquetas
+  IA / Humano / Aguardando e botão "Assumir conversa".
+- **Pipeline** — funil kanban: novo lead → qualificação → qualificado →
+  reunião marcada → fechado.
+- **Agente IA** — chat funcional com o agente (veja abaixo).
+
+> Os números e conversas do painel são **dados de demonstração** (rotulados
+> como tal na interface). Em produção, conecte às fontes reais da agência.
+
+## IA integrada (`ia.php`)
+
+O chat da aba **Agente IA** chama `ia.php`, que responde em um de dois modos:
+
+| Modo | Quando | Como ativar |
+|---|---|---|
+| **IA real** | Chave da Anthropic configurada | Defina a variável de ambiente `IA_API_KEY` (ou `ANTHROPIC_API_KEY`) no servidor. Modelo padrão: `claude-opus-5` (mude com `IA_MODELO`). |
+| **Demonstração** | Sem chave | Automático — respostas pré-programadas em PT-BR usando os dados reais dos planos. |
+
+O agente real recebe um system prompt com os planos do `config.php` e
+instruções de tom (PT-BR, respostas curtas, qualificação de leads,
+transferência para humano). **Nunca** coloque a chave no código — apenas em
+variável de ambiente:
+
+```bash
+# Apache (.htaccess ou vhost)
+SetEnv IA_API_KEY "sk-ant-..."
 ```
 
 ## Planos (config.php)
