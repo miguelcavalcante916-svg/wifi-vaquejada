@@ -14,11 +14,41 @@
 
 require __DIR__ . '/config.php';
 
+// Hospedagens compartilhadas nem sempre têm mbstring; degrada para substr
+// (pode partir um caractere multibyte no corte, aceitável para sanitização).
+if (!function_exists('mb_substr')) {
+    function mb_substr($s, $i, $l = null) { return $l === null ? substr($s, $i) : substr($s, $i, $l); }
+    function mb_strtolower($s) { return strtolower($s); }
+    function mb_strpos($h, $n) { return strpos($h, $n); }
+    function mb_strlen($s) { return strlen($s); }
+}
+
 header('Content-Type: application/json; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    header('Allow: POST');
     http_response_code(405);
     echo json_encode(['ok' => false, 'erro' => 'Use POST.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Só o próprio site (o chat do painel) pode usar este endpoint — evita que
+// terceiros consumam os créditos da API. Requisições sem esses headers
+// (ex.: curl para teste) continuam aceitas.
+$sf = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
+$hostAtual = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
+$origem = $_SERVER['HTTP_ORIGIN'] ?? ($_SERVER['HTTP_REFERER'] ?? '');
+$hostOrigem = $origem !== '' ? strtolower((string) (parse_url($origem, PHP_URL_HOST) ?: '')) : '';
+if (($sf !== '' && !in_array($sf, ['same-origin', 'same-site', 'none'], true))
+    || ($hostOrigem !== '' && $hostAtual !== '' && $hostOrigem !== $hostAtual)) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'erro' => 'Origem não autorizada.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') === false) {
+    http_response_code(415);
+    echo json_encode(['ok' => false, 'erro' => 'Envie JSON (Content-Type: application/json).'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -29,10 +59,15 @@ $brutas = is_array($corpo['mensagens'] ?? null) ? $corpo['mensagens'] : [];
 $mensagens = [];
 foreach (array_slice($brutas, -12) as $m) {
     $de    = ($m['de'] ?? '') === 'agente' ? 'agente' : 'cliente';
-    $texto = trim(mb_substr((string) ($m['texto'] ?? ''), 0, 2000));
+    $texto = is_string($m['texto'] ?? null) ? trim(mb_substr($m['texto'], 0, 2000)) : '';
     if ($texto !== '') {
         $mensagens[] = ['de' => $de, 'texto' => $texto];
     }
+}
+// A API exige que o histórico comece pelo cliente; o corte acima pode ter
+// deixado uma resposta do agente na frente.
+while ($mensagens && $mensagens[0]['de'] !== 'cliente') {
+    array_shift($mensagens);
 }
 if (!$mensagens || end($mensagens)['de'] !== 'cliente') {
     http_response_code(400);
@@ -82,18 +117,24 @@ function ia_responder_anthropic($chave, array $mensagens, array $ag, array $plan
         . "Se pedirem um atendente humano, diga que vai transferir para a equipe. "
         . "Se perguntarem se você é um robô ou IA, confirme que é o assistente virtual da agência.";
 
+    // A API exige papéis alternados; mensagens seguidas do mesmo lado
+    // (ex.: cliente reenviou após falha de rede) são mescladas.
     $msgs = [];
     foreach ($mensagens as $m) {
-        $msgs[] = [
-            'role'    => $m['de'] === 'agente' ? 'assistant' : 'user',
-            'content' => $m['texto'],
-        ];
+        $role = $m['de'] === 'agente' ? 'assistant' : 'user';
+        $ultimo = $msgs ? array_key_last($msgs) : null;
+        if ($ultimo !== null && $msgs[$ultimo]['role'] === $role) {
+            $msgs[$ultimo]['content'] .= "\n" . $m['texto'];
+        } else {
+            $msgs[] = ['role' => $role, 'content' => $m['texto']];
+        }
     }
 
-    // Respostas de chat são curtas por design; 1024 tokens é teto folgado.
+    // Respostas de chat são curtas por instrução do system prompt; o teto
+    // maior dá folga ao raciocínio interno do modelo (conta em max_tokens).
     $payload = [
         'model'      => getenv('IA_MODELO') ?: 'claude-opus-5',
-        'max_tokens' => 1024,
+        'max_tokens' => 4096,
         'system'     => $system,
         'messages'   => $msgs,
     ];
@@ -134,6 +175,11 @@ function ia_responder_anthropic($chave, array $mensagens, array $ag, array $plan
         }
     }
     $texto = trim($texto);
+    if ($texto === '' && ($dados['stop_reason'] ?? '') === 'max_tokens') {
+        // Orçamento consumido antes do texto: pede uma reformulação em vez
+        // de mascarar o modo IA como demo.
+        return 'Essa ficou longa para mim! 😅 Consegue perguntar de forma mais direta? Assim te respondo na hora.';
+    }
     return $texto !== '' ? $texto : null;
 }
 
@@ -143,9 +189,18 @@ function ia_responder_anthropic($chave, array $mensagens, array $ag, array $plan
  */
 function ia_responder_demo($ultima, array $ag, array $planos) {
     $t = mb_strtolower($ultima);
+    // Palavras curtas ("ia", "oi", "bot") exigem fronteira de palavra para não
+    // casarem dentro de outras ("dia", "dois", "botão"); as longas podem ser
+    // substring ("obrigad" cobre obrigado/obrigada).
     $tem = function (...$palavras) use ($t) {
         foreach ($palavras as $p) {
-            if (mb_strpos($t, $p) !== false) return true;
+            if (mb_strlen($p) <= 3) {
+                if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote($p, '/') . '(?![\p{L}\p{N}])/u', $t)) {
+                    return true;
+                }
+            } elseif (mb_strpos($t, $p) !== false) {
+                return true;
+            }
         }
         return false;
     };

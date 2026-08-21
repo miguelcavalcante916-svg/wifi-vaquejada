@@ -7,10 +7,16 @@
   /* ---------- Abas ---------- */
   var itens = document.querySelectorAll('.dash-nav__item');
   var abas = document.querySelectorAll('.dash-tab');
+  var tabsValidas = Array.prototype.map.call(itens, function (i) { return i.getAttribute('data-tab'); });
 
   function abrir(tab) {
-    itens.forEach(function (i) { i.classList.toggle('is-active', i.getAttribute('data-tab') === tab); });
-    abas.forEach(function (a) { a.classList.toggle('is-active', a.id === 'tab-' + tab); });
+    if (tabsValidas.indexOf(tab) === -1) return;
+    itens.forEach(function (i) {
+      var ativa = i.getAttribute('data-tab') === tab;
+      i.classList.toggle('is-active', ativa);
+      if (ativa) { i.setAttribute('aria-current', 'true'); } else { i.removeAttribute('aria-current'); }
+    });
+    abas.forEach(function (a) { a.classList.toggle('is-active', a.id === tab); });
   }
 
   itens.forEach(function (item) {
@@ -21,10 +27,9 @@
 
   // Abre a aba indicada no hash (#agente, #pipeline…)
   var hash = (location.hash || '').replace('#', '');
-  if (hash && document.getElementById('tab-' + hash)) abrir(hash);
+  if (hash) abrir(hash);
   window.addEventListener('hashchange', function () {
-    var h = (location.hash || '').replace('#', '');
-    if (h && document.getElementById('tab-' + h)) abrir(h);
+    abrir((location.hash || '').replace('#', ''));
   });
 
   /* ---------- Chat do Agente IA ---------- */
@@ -47,6 +52,7 @@
     var b = document.createElement('div');
     b.className = 'bubble bubble--' + (lado === 'agente' ? 'out' : 'in');
     b.textContent = texto;
+    b.appendChild(document.createTextNode(' '));
     var t = document.createElement('small');
     t.textContent = hora();
     b.appendChild(t);
@@ -73,6 +79,7 @@
 
     bolha('cliente', texto);
     historico.push({ de: 'cliente', texto: texto });
+    if (historico.length > 60) historico = historico.slice(-40);
 
     var tip = digitando();
     var controller = ('AbortController' in window) ? new AbortController() : null;
@@ -81,12 +88,20 @@
     fetch('ia.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ mensagens: historico }),
+      body: JSON.stringify({ mensagens: historico.slice(-12) }),
       signal: controller ? controller.signal : undefined
     })
-      .then(function (res) { return res.json(); })
+      .then(function (res) {
+        return res.json()
+          .catch(function () { throw new Error('HTTP ' + res.status); })
+          .then(function (data) {
+            if (!res.ok || !data || !data.ok || !data.resposta) {
+              throw new Error((data && data.erro) || ('HTTP ' + res.status));
+            }
+            return data;
+          });
+      })
       .then(function (data) {
-        if (!data || !data.ok || !data.resposta) throw new Error('resposta vazia');
         if (modoEl) {
           modoEl.textContent = data.modo === 'ia' ? 'IA conectada' : 'Modo demonstração';
         }
@@ -94,9 +109,11 @@
         tip.remove();
         bolha('agente', data.resposta);
       })
-      .catch(function () {
+      .catch(function (err) {
         tip.remove();
-        bolha('agente', 'Ops, não consegui responder agora. Tente novamente em instantes.');
+        var extra = (err && err.message && err.message.indexOf('HTTP') !== 0 && err.message !== 'Failed to fetch')
+          ? ' (' + err.message + ')' : '';
+        bolha('agente', 'Ops, não consegui responder agora. Tente novamente em instantes.' + extra);
       })
       .then(function () {
         clearTimeout(timeout);

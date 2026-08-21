@@ -52,7 +52,7 @@
 
 .dash-main { min-width: 0; }
 .dash-tab { display: none; }
-.dash-tab.is-active { display: block; }
+.dash-tab.is-active, .dash-tab:target { display: block; } /* :target = fallback sem JS */
 
 .dash-h1 { font-size: 1.5rem; margin-bottom: 20px; }
 .dash-h2 { font-size: 1.02rem; margin-bottom: 14px; color: var(--text); }
@@ -85,6 +85,7 @@
 .stat__label { color: var(--muted-2); font-size: .84rem; }
 
 /* Gráfico (barras) — texto em tokens de texto; cor da série só nas marcas */
+.chart-scroll { overflow-x: auto; }
 .chart { width: 100%; height: auto; display: block; }
 .chart__axis { stroke: var(--line-2); stroke-width: 1; }
 .chart__bar path { fill: var(--blue); transition: fill .15s; }
@@ -106,6 +107,8 @@
 
 /* Conversas */
 .convo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.convo-list--mini .convo { padding: 8px 6px; }
+.convo-list--mini .convo__avatar { width: 34px; height: 34px; font-size: .78rem; }
 .convo {
     display: flex; align-items: center; gap: 12px;
     padding: 12px 10px; border-radius: 12px;
@@ -146,8 +149,8 @@
     padding: 16px 4px; min-height: 220px; max-height: 420px; overflow-y: auto;
 }
 
-/* Kanban */
-.kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; align-items: start; }
+/* Kanban — largura mínima por coluna; rolagem fica contida no próprio kanban */
+.kanban { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 14px; align-items: start; overflow-x: auto; padding-bottom: 8px; }
 .kanban__col { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
 .kanban__title { font-size: .85rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .kanban__count { background: rgba(67, 97, 238, .16); color: var(--blue-light); font-size: .74rem; padding: 2px 8px; border-radius: 999px; }
@@ -209,5 +212,7 @@
 @media (max-width: 560px) {
     .kanban { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr 1fr; }
-    .dash-top__right .dash-badge--demo { display: none; }
+    /* Selo de demonstração continua visível, só mais compacto */
+    .dash-top__right .dash-badge--demo { padding: 6px 8px; font-size: .7rem; }
+    .chart-scroll .chart { min-width: 440px; } /* rótulos legíveis; rolagem no wrapper */
 }

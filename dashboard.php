@@ -103,7 +103,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
 <div class="dash-wrap">
     <!-- Navegação lateral / abas -->
     <nav class="dash-nav" aria-label="Seções do painel">
-        <a href="#visao" class="dash-nav__item is-active" data-tab="visao">📊 <span>Visão geral</span></a>
+        <a href="#visao" class="dash-nav__item is-active" data-tab="visao" aria-current="true">📊 <span>Visão geral</span></a>
         <a href="#conversas" class="dash-nav__item" data-tab="conversas">💬 <span>Conversas</span></a>
         <a href="#pipeline" class="dash-nav__item" data-tab="pipeline">🧭 <span>Pipeline</span></a>
         <a href="#agente" class="dash-nav__item" data-tab="agente">🤖 <span>Agente IA</span></a>
@@ -112,7 +112,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
     <main id="conteudo" class="dash-main">
 
     <!-- ============ VISÃO GERAL ============ -->
-    <section class="dash-tab is-active" id="tab-visao" aria-labelledby="h-visao">
+    <section class="dash-tab is-active" id="visao" aria-labelledby="h-visao">
         <h1 id="h-visao" class="dash-h1">Visão geral</h1>
 
         <div class="stats">
@@ -128,8 +128,9 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
         <div class="dash-grid2">
             <div class="dash-card">
                 <h2 class="dash-h2">Atendimentos — últimos 7 dias</h2>
+                <div class="chart-scroll">
                 <svg class="chart" viewBox="0 0 <?= $gW ?> <?= $gH ?>" role="img"
-                     aria-label="Gráfico de barras: atendimentos por dia nos últimos 7 dias, de <?= min(array_column($GRAFICO,1)) ?> a <?= $gMax ?>">
+                     aria-label="Atendimentos por dia: <?= htmlspecialchars(implode(', ', array_map(function ($d) { return $d[0] . ' ' . $d[1]; }, $GRAFICO))) ?>">
                     <line x1="<?= $gPad ?>" y1="<?= $gBase ?>" x2="<?= $gW - $gPad ?>" y2="<?= $gBase ?>" class="chart__axis"/>
                     <?php foreach ($GRAFICO as $i => $d):
                         $h = (int) round(($d[1] / $gMax) * ($gBase - 30));
@@ -147,6 +148,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
                     </g>
                     <?php endforeach; ?>
                 </svg>
+                </div>
             </div>
 
             <div class="dash-card">
@@ -155,7 +157,9 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
                 <div class="credit">
                     <strong class="credit__num"><?= number_format($CREDITOS['usados'], 0, ',', '.') ?></strong>
                     <span class="credit__of">de <?= number_format($CREDITOS['total'], 0, ',', '.') ?> créditos no trimestre</span>
-                    <div class="credit__bar" role="progressbar" aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Créditos usados">
+                    <div class="credit__bar" role="meter" aria-valuenow="<?= $pct ?>" aria-valuemin="0" aria-valuemax="100"
+                         aria-valuetext="<?= number_format($CREDITOS['usados'], 0, ',', '.') ?> de <?= number_format($CREDITOS['total'], 0, ',', '.') ?> créditos (<?= $pct ?>%)"
+                         aria-label="Créditos de IA usados">
                         <span style="width: <?= $pct ?>%"></span>
                     </div>
                     <span class="credit__pct"><?= $pct ?>% usados</span>
@@ -185,7 +189,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
     </section>
 
     <!-- ============ CONVERSAS ============ -->
-    <section class="dash-tab" id="tab-conversas" aria-labelledby="h-conversas">
+    <section class="dash-tab" id="conversas" aria-labelledby="h-conversas">
         <h1 id="h-conversas" class="dash-h1">Conversas</h1>
         <div class="inbox">
             <div class="dash-card inbox__list">
@@ -211,9 +215,9 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
                     <div><strong>João S.</strong><small class="thread__status">Atendido pelo Agente de IA</small></div>
                     <button type="button" class="btn btn--outline btn--sm">Assumir conversa</button>
                 </header>
-                <div class="thread__chat">
+                <div class="thread__chat" role="log" aria-label="Mensagens da conversa" tabindex="0">
                     <?php foreach ($THREAD as $m): ?>
-                    <div class="bubble bubble--<?= $m[0] ?>"><?= htmlspecialchars($m[1]) ?><small><?= $m[2] ?></small></div>
+                    <div class="bubble bubble--<?= $m[0] ?>"><?= htmlspecialchars($m[1]) ?> <small><span class="sr-only">Enviada às </span><?= $m[2] ?></small></div>
                     <?php endforeach; ?>
                 </div>
                 <p class="dash-note">Conversa de demonstração — em produção, as conversas reais do seu WhatsApp aparecem aqui.</p>
@@ -222,7 +226,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
     </section>
 
     <!-- ============ PIPELINE ============ -->
-    <section class="dash-tab" id="tab-pipeline" aria-labelledby="h-pipeline">
+    <section class="dash-tab" id="pipeline" aria-labelledby="h-pipeline">
         <h1 id="h-pipeline" class="dash-h1">Pipeline de vendas</h1>
         <div class="kanban">
             <?php foreach ($PIPELINE as $col): ?>
@@ -241,7 +245,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
     </section>
 
     <!-- ============ AGENTE IA ============ -->
-    <section class="dash-tab" id="tab-agente" aria-labelledby="h-agente">
+    <section class="dash-tab" id="agente" aria-labelledby="h-agente">
         <h1 id="h-agente" class="dash-h1">Agente IA — converse com o seu agente</h1>
         <div class="dash-grid2 dash-grid2--chat">
             <div class="dash-card ia-chat">
@@ -252,7 +256,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
                         <small class="thread__status" id="iaModo"><?= $iaConfigurada ? 'IA conectada' : 'Modo demonstração' ?></small>
                     </div>
                 </header>
-                <div class="thread__chat ia-chat__log" id="iaLog" aria-live="polite"></div>
+                <div class="thread__chat ia-chat__log" id="iaLog" role="log" aria-live="polite" aria-label="Histórico da conversa com o agente" tabindex="0"></div>
                 <form class="ia-chat__form" id="iaForm">
                     <label class="sr-only" for="iaInput">Sua mensagem</label>
                     <input id="iaInput" type="text" maxlength="2000" placeholder="Escreva como se fosse seu cliente…" autocomplete="off">
