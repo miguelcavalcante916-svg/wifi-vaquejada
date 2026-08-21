@@ -133,8 +133,4 @@
     });
   }
 
-  /* ---------- Ano no rodapé (fallback caso necessário) ---------- */
-  document.querySelectorAll('[data-year]').forEach(function (el) {
-    el.textContent = new Date().getFullYear();
-  });
 })();
