@@ -15,7 +15,7 @@ $anoAtual    = $AGENCIA['ano'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a1014">
-    <title><?= htmlspecialchars($AGENCIA['nome']) ?> — <?= htmlspecialchars($AGENCIA['slogan']) ?></title>
+    <title><?= htmlspecialchars($AGENCIA['nome']) ?> — Painel do Agente de IA</title>
     <meta name="description" content="<?= htmlspecialchars($AGENCIA['descricao']) ?>">
 
     <meta property="og:type" content="website">
@@ -56,14 +56,13 @@ $anoAtual    = $AGENCIA['ano'];
         <nav class="nav" id="nav" aria-label="Navegação principal">
             <a href="#recursos">Recursos</a>
             <a href="#como-funciona">Como funciona</a>
-            <a href="#planos">Planos</a>
             <a href="#depoimentos">Exemplos</a>
             <a href="#perguntas">Perguntas</a>
         </nav>
 
         <div class="header__actions">
-            <a class="btn btn--ghost btn--sm" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Falar no WhatsApp</a>
-            <a class="btn btn--primary btn--sm" href="#planos" data-scroll>Testar grátis</a>
+            <span class="status-pill" aria-label="Agente ativo"><span class="status-pill__dot" aria-hidden="true"></span> Agente ativo</span>
+            <a class="btn btn--primary btn--sm" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Conversar no WhatsApp</a>
         </div>
 
         <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false" aria-controls="nav">
@@ -81,20 +80,20 @@ $anoAtual    = $AGENCIA['ano'];
         <div class="hero__copy">
             <span class="pill">
                 <span class="pill__dot"></span>
-                Agente de IA para o WhatsApp Business
+                Seu Agente de IA · por <?= htmlspecialchars($AGENCIA['nome']) ?>
             </span>
             <h1 class="hero__title">
-                Seu atendimento no WhatsApp trabalhando <span class="grad">24 horas por dia</span>, sem parar.
+                Bem-vindo ao seu <span class="grad">Agente de IA</span> no WhatsApp.
             </h1>
             <p class="hero__lead">
-                A <?= htmlspecialchars($AGENCIA['nome']) ?> instala um Agente de Inteligência Artificial que
-                responde, qualifica leads, agenda reuniões e vende no seu WhatsApp — com a naturalidade de um
+                A <?= htmlspecialchars($AGENCIA['nome']) ?> preparou um Agente de Inteligência Artificial que
+                responde, qualifica e agenda no seu WhatsApp 24 horas por dia — com a naturalidade de um
                 atendente humano e a velocidade de uma máquina.
             </p>
 
             <div class="hero__cta">
-                <a class="btn btn--primary btn--lg" href="#planos" data-scroll>
-                    Começar teste grátis
+                <a class="btn btn--primary btn--lg" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">
+                    Conversar com o agente
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </a>
                 <a class="btn btn--outline btn--lg" href="#como-funciona" data-scroll>Ver como funciona</a>
@@ -148,7 +147,7 @@ $anoAtual    = $AGENCIA['ano'];
 <section class="section value">
     <div class="container">
         <div class="section__head">
-            <span class="eyebrow">Por que sua empresa precisa disso</span>
+            <span class="eyebrow">O que o agente resolve</span>
             <h2>Cada mensagem sem resposta é uma venda que vai para o concorrente.</h2>
             <p>O cliente do WhatsApp não espera. Se ninguém responde em minutos, ele fecha com quem respondeu primeiro. O Agente de IA da Cavalcante garante que <strong>nenhuma conversa fique parada</strong> — de dia, de noite, no fim de semana e no feriado.</p>
         </div>
@@ -236,64 +235,6 @@ $anoAtual    = $AGENCIA['ano'];
     </div>
 </section>
 
-<!-- ===================== PLANOS ===================== -->
-<section class="section" id="planos">
-    <div class="container">
-        <div class="section__head">
-            <span class="eyebrow">Planos</span>
-            <h2>Escolha o plano e comece hoje</h2>
-            <p>Todos os planos incluem implantação assistida e teste grátis. Cancele quando quiser.</p>
-        </div>
-
-        <div class="plans">
-            <?php foreach ($PLANOS as $p): ?>
-            <article class="plan <?= $p['destaque'] ? 'plan--featured' : '' ?>">
-                <?php if ($p['destaque']): ?><span class="plan__tag">Mais escolhido</span><?php endif; ?>
-                <header class="plan__head">
-                    <h3 class="plan__name"><?= htmlspecialchars($p['nome']) ?></h3>
-                    <p class="plan__summary"><?= htmlspecialchars($p['resumo']) ?></p>
-                    <div class="plan__price">
-                        <span class="plan__currency">R$</span>
-                        <span class="plan__value"><?= number_format($p['preco'], 0, ',', '.') ?></span>
-                        <span class="plan__period"><?= htmlspecialchars($p['periodo']) ?></span>
-                    </div>
-                    <span class="plan__billing"><?= htmlspecialchars($p['cobranca']) ?></span>
-                    <span class="plan__credits"><?= htmlspecialchars($p['creditos']) ?></span>
-                </header>
-
-                <ul class="plan__features">
-                    <?php foreach ($p['recursos'] as $r): ?>
-                    <li class="<?= $r['incluso'] ? 'is-in' : 'is-out' ?>">
-                        <?php if ($r['incluso']): ?>
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
-                        <?php else: ?>
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                        <?php endif; ?>
-                        <span class="sr-only"><?= $r['incluso'] ? 'Incluído: ' : 'Não incluído: ' ?></span>
-                        <span><?= htmlspecialchars($r['texto']) ?></span>
-                    </li>
-                    <?php endforeach; ?>
-                </ul>
-
-                <div class="plan__actions">
-                    <button type="button" class="btn btn--primary btn--block js-assinar" data-plano="<?= (int) $p['plano'] ?>" data-nome="<?= htmlspecialchars($p['nome']) ?>">
-                        <?= htmlspecialchars($p['cta']) ?>
-                    </button>
-                    <button type="button" class="btn btn--outline btn--block js-trial" data-plano="<?= (int) $p['plano'] ?>" data-nome="<?= htmlspecialchars($p['nome']) ?>">
-                        Testar grátis
-                    </button>
-                </div>
-            </article>
-            <?php endforeach; ?>
-        </div>
-
-        <p class="plans__note">
-            Precisa de um volume maior ou um projeto sob medida?
-            <a href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Fale com a nossa equipe</a>.
-        </p>
-    </div>
-</section>
-
 <!-- ===================== EXEMPLOS DE USO ===================== -->
 <section class="section section--alt" id="depoimentos">
     <div class="container">
@@ -331,12 +272,11 @@ $anoAtual    = $AGENCIA['ano'];
         <div class="faq">
             <?php
             $faqs = [
+                ['Como começo a usar o agente?', 'É só tocar em “Conversar no WhatsApp” e enviar uma mensagem. O agente responde na hora, a qualquer dia e horário.'],
                 ['O agente funciona no meu número atual de WhatsApp?', 'Sim. Conectamos o agente ao número da sua empresa de forma segura, seguindo as diretrizes do WhatsApp Business. Você continua com o mesmo número que seus clientes já conhecem.'],
                 ['A IA responde como um robô?', 'Não. O agente entende contexto, interpreta áudios e imagens e conversa no tom da sua marca. A conversa flui de forma natural, e o agente pode se identificar como assistente virtual sempre que necessário.'],
                 ['Consigo assumir a conversa quando quiser?', 'Sim. A qualquer momento um atendente humano pode entrar na conversa pelo painel, e o agente também transfere sozinho quando o caso é mais delicado.'],
-                ['O que são os créditos de IA?', 'São a medida de uso do agente (mensagens, áudios e ações inteligentes). Cada plano inclui uma quantidade trimestral, e você pode subir de plano a qualquer momento.'],
                 ['Preciso saber de tecnologia para usar?', 'Não. A Agência Cavalcante cuida de toda a implantação, do treinamento do agente e dos ajustes. Você acompanha os resultados por um painel simples.'],
-                ['Posso testar antes de assinar?', 'Pode. Todos os planos têm teste grátis. Clique em “Testar grátis” no plano desejado e comece agora mesmo.'],
             ];
             foreach ($faqs as $i => $q): ?>
             <details class="faq__item"<?= $i === 0 ? ' open' : '' ?>>
@@ -356,11 +296,11 @@ $anoAtual    = $AGENCIA['ano'];
     <div class="container">
         <div class="cta-final">
             <div class="cta-final__glow" aria-hidden="true"></div>
-            <h2>Pronto para nunca mais perder um cliente no WhatsApp?</h2>
-            <p>Coloque o Agente de IA da Cavalcante para trabalhar hoje e veja seu atendimento virar máquina de vendas.</p>
+            <h2>Pronto para colocar seu Agente de IA para trabalhar?</h2>
+            <p>Converse agora com o agente no WhatsApp ou fale com a Agência Cavalcante para ajustar qualquer detalhe.</p>
             <div class="cta-final__actions">
-                <a class="btn btn--primary btn--lg" href="#planos" data-scroll>Escolher meu plano</a>
-                <a class="btn btn--outline btn--lg" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Falar com um especialista</a>
+                <a class="btn btn--primary btn--lg" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Conversar no WhatsApp</a>
+                <a class="btn btn--outline btn--lg" href="mailto:<?= htmlspecialchars($AGENCIA['email']) ?>">Falar com a agência</a>
             </div>
         </div>
     </div>
@@ -385,7 +325,7 @@ $anoAtual    = $AGENCIA['ano'];
             <h3>Navegação</h3>
             <a href="#recursos">Recursos</a>
             <a href="#como-funciona">Como funciona</a>
-            <a href="#planos">Planos</a>
+            <a href="#depoimentos">Exemplos</a>
             <a href="#perguntas">Perguntas</a>
         </nav>
 
@@ -398,7 +338,7 @@ $anoAtual    = $AGENCIA['ano'];
     </div>
     <div class="container footer__bottom">
         <span>© <?= $anoAtual ?> <?= htmlspecialchars($AGENCIA['nome']) ?>. Todos os direitos reservados.</span>
-        <span>Feito para vender no WhatsApp.</span>
+        <span>Atendimento inteligente no WhatsApp.</span>
     </div>
 </footer>
 
@@ -406,9 +346,6 @@ $anoAtual    = $AGENCIA['ano'];
 <a class="wa-float" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
     <svg viewBox="0 0 32 32" width="30" height="30" fill="currentColor" aria-hidden="true"><path d="M16 3C9 3 3.4 8.6 3.4 15.6c0 2.5.7 4.9 2 7L3 29l6.6-2.3c2 .9 4.1 1.4 6.4 1.4 7 0 12.6-5.6 12.6-12.6C28.6 8.6 23 3 16 3zm0 22.9c-2 0-3.9-.5-5.6-1.5l-.4-.2-3.9 1.4 1.3-3.8-.3-.4a10.3 10.3 0 0 1-1.6-5.5C5.5 9.9 10.2 5.3 16 5.3S26.5 9.9 26.5 15.6 21.8 25.9 16 25.9zm5.9-7.7c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.3-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.3.4-.6.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.2-1.2 2.9s1.2 3.4 1.4 3.6c.2.2 2.4 3.7 5.8 5.1.8.3 1.5.6 2 .7.8.3 1.6.2 2.2.1.7-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg>
 </a>
-
-<!-- Toast de feedback -->
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 window.AGENCIA = {

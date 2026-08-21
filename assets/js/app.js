@@ -1,12 +1,8 @@
 /* =========================================================================
-   Agência Cavalcante — Interatividade e checkout
+   Agência Cavalcante — Painel do Agente de IA (interatividade)
    ========================================================================= */
 (function () {
   'use strict';
-
-  var whatsappBase = (window.AGENCIA && window.AGENCIA.whatsapp)
-    || document.body.getAttribute('data-whatsapp')
-    || '#';
 
   /* ---------- Menu mobile ---------- */
   var navToggle = document.getElementById('navToggle');
@@ -47,7 +43,7 @@
 
   /* ---------- Reveal on scroll ---------- */
   var revealTargets = document.querySelectorAll(
-    '.feature, .value__card, .step, .plan, .testimonial, .section__head, .cta-final'
+    '.feature, .value__card, .step, .testimonial, .section__head, .cta-final'
   );
   revealTargets.forEach(function (el) { el.classList.add('reveal'); });
 
@@ -63,20 +59,6 @@
     revealTargets.forEach(function (el) { io.observe(el); });
   } else {
     revealTargets.forEach(function (el) { el.classList.add('is-visible'); });
-  }
-
-  /* ---------- Toast ---------- */
-  var toastEl = document.getElementById('toast');
-  var toastTimer;
-  function toast(msg, isError) {
-    if (!toastEl) return;
-    toastEl.textContent = msg;
-    toastEl.classList.toggle('is-error', !!isError);
-    toastEl.classList.add('is-show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () {
-      toastEl.classList.remove('is-show');
-    }, 4200);
   }
 
   /* ---------- Demo de chat animado ---------- */
@@ -150,113 +132,6 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-
-  /* ---------- Checkout / Trial ---------- */
-  // Chaves priorizadas: específicas de checkout primeiro, genéricas por último.
-  var URL_KEYS = ['checkout_url', 'checkoutUrl', 'checkout', 'payment_url', 'paymentUrl',
-    'pay_url', 'invoice_url', 'invoiceUrl', 'init_point', 'redirect_url', 'redirect',
-    'url', 'link'];
-  // Chaves que apontam para imagem/QR, nunca destino de navegação.
-  var SKIP_KEYS = /qr|image|img|logo|avatar|icon|photo|thumb/i;
-
-  function looksLikeUrl(v) {
-    return typeof v === 'string' && /^https?:\/\/\S+/i.test(v.trim());
-  }
-
-  // Procura recursivamente uma URL na resposta do backend.
-  function findUrl(data, depth) {
-    depth = depth || 0;
-    if (depth > 4 || data == null) return null;
-    if (looksLikeUrl(data)) return data.trim();
-    if (typeof data !== 'object') return null;
-
-    // prioriza chaves conhecidas
-    for (var k = 0; k < URL_KEYS.length; k++) {
-      var val = data[URL_KEYS[k]];
-      if (looksLikeUrl(val)) return val.trim();
-    }
-    // varre demais valores, ignorando campos de imagem/QR
-    for (var key in data) {
-      if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
-      if (SKIP_KEYS.test(key)) continue;
-      var found = findUrl(data[key], depth + 1);
-      if (found) return found;
-    }
-    return null;
-  }
-
-  function planMessage(nome, tipo) {
-    var acao = tipo === 'trial'
-      ? 'quero iniciar o teste grátis'
-      : 'quero assinar';
-    return 'Olá! Vim pelo site da Agência Cavalcante e ' + acao +
-      (nome ? ' o plano ' + nome + '.' : '.');
-  }
-
-  function whatsFallback(nome, tipo) {
-    // remove qualquer ?text=/&text= existente e recria a query a partir da base limpa
-    var base = whatsappBase.split(/[?&]text=/)[0];
-    var sep = base.indexOf('?') === -1 ? '?text=' : '&text=';
-    return base + sep + encodeURIComponent(planMessage(nome, tipo));
-  }
-
-  function handleCheckout(btn, endpoint, tipo) {
-    var plano = btn.getAttribute('data-plano') || '2';
-    var nome = btn.getAttribute('data-nome') || '';
-    if (btn.classList.contains('is-loading')) return;
-
-    btn.classList.add('is-loading');
-    btn.setAttribute('aria-busy', 'true');
-
-    var controller = ('AbortController' in window) ? new AbortController() : null;
-    var timeout = setTimeout(function () { if (controller) controller.abort(); }, 15000);
-
-    fetch(endpoint + '?plano=' + encodeURIComponent(plano), {
-      headers: { 'Accept': 'application/json' },
-      signal: controller ? controller.signal : undefined
-    })
-      .then(function (res) {
-        return res.text().then(function (txt) {
-          var data = txt;
-          try { data = JSON.parse(txt); } catch (e) { /* mantém texto */ }
-          return data;
-        });
-      })
-      .then(function (data) {
-        if (data && typeof data === 'object' && data.ok === false && data.erro) {
-          throw new Error(data.erro);
-        }
-        var url = findUrl(data);
-        if (url) {
-          toast(tipo === 'trial' ? 'Abrindo seu teste grátis…' : 'Redirecionando para o checkout…');
-          window.location.href = url;
-        } else {
-          throw new Error('Sem link de checkout na resposta.');
-        }
-      })
-      .catch(function (err) {
-        var msg = (err && err.name === 'AbortError')
-          ? 'O servidor demorou a responder. Vamos te levar ao WhatsApp.'
-          : 'Não foi possível concluir agora. Continue pelo WhatsApp.';
-        toast(msg, true);
-        // Navegação na mesma aba: não é bloqueada como popup fora do gesto do usuário.
-        setTimeout(function () {
-          window.location.href = whatsFallback(nome, tipo);
-        }, 900);
-      })
-      .then(function () {
-        clearTimeout(timeout);
-        btn.classList.remove('is-loading');
-        btn.removeAttribute('aria-busy');
-      });
-  }
-
-  document.querySelectorAll('.js-assinar').forEach(function (btn) {
-    btn.addEventListener('click', function () { handleCheckout(btn, 'voucher.php', 'assinar'); });
-  });
-  document.querySelectorAll('.js-trial').forEach(function (btn) {
-    btn.addEventListener('click', function () { handleCheckout(btn, 'trial.php', 'trial'); });
-  });
 
   /* ---------- Ano no rodapé (fallback caso necessário) ---------- */
   document.querySelectorAll('[data-year]').forEach(function (el) {

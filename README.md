@@ -1,16 +1,16 @@
-# Agência Cavalcante — Agente de IA no WhatsApp
+# Agência Cavalcante — Painel do Agente de IA (WhatsApp)
 
-Site de vendas (landing page) + endpoints de checkout para o serviço de
-**Agente de IA no WhatsApp** da Agência Cavalcante: atendimento automático 24h,
-qualificação de leads, agendamento, follow-up e pipeline de vendas.
+Tela de **apresentação / painel** do Agente de IA no WhatsApp da Agência
+Cavalcante, feita para viver **dentro do web app da agência** e ser entregue ao
+cliente. O foco é *mostrar e usar* o agente — não vender: não há planos nem
+checkout.
 
-O sistema é feito em **PHP puro** (sem framework) e conversa com um backend
-próprio (a "ponte") que gera os trials e os links de pagamento.
+Feito em **PHP puro** (sem framework) e **sem dependências de backend** — as
+ações levam direto ao WhatsApp por deep link (`wa.me`). Isso deixa o painel
+autossuficiente e fácil de embutir.
 
-> **Sobre a inspiração:** o conceito (agente de IA para WhatsApp, com planos por
-> créditos, trial e voucher) é comum no mercado. Todo o design, textos e código
-> deste repositório são **originais** — não é uma cópia de nenhum site de
-> terceiros.
+> Todo o design, textos e código são **originais**. O conceito (agente de IA para
+> WhatsApp) é comum no mercado; nada aqui é cópia de site de terceiros.
 
 ---
 
@@ -18,51 +18,36 @@ próprio (a "ponte") que gera os trials e os links de pagamento.
 
 ```
 .
-├── index.php          # Landing page (hero, recursos, planos, FAQ, etc.)
-├── config.php         # Configuração central: agência, PONTE_URL, planos
-├── trial.php          # Endpoint: inicia teste grátis (proxy p/ a ponte)
-├── voucher.php        # Endpoint: gera link de checkout de um plano
+├── index.php          # O painel/apresentação (hero, recursos, como funciona,
+│                      #   exemplos de uso, FAQ, CTA, rodapé)
+├── config.php         # Dados da agência (nome, WhatsApp, e-mail, Instagram)
 ├── status.php         # Healthcheck simples (GET /status.php → JSON)
 ├── composer.json      # Requisito de versão do PHP
 └── assets/
     ├── css/style.css  # Design system (tema escuro, verde/teal, responsivo)
-    └── js/app.js      # Interatividade + integração de checkout
+    └── js/app.js      # Menu, FAQ, reveal on scroll, demo de chat animado
 ```
 
-## Como funciona o checkout
+## Como embutir no app da agência
 
-1. O visitante clica em **Assinar** ou **Testar grátis** em um plano.
-2. O `app.js` chama, respectivamente, `voucher.php?plano=N` ou `trial.php`.
-3. Esses endpoints repassam a chamada para a **ponte** (`PONTE_URL`) e devolvem
-   a resposta em JSON.
-4. O JS procura um link de checkout na resposta e **redireciona** o visitante.
-5. Se a ponte estiver fora do ar ou não devolver link, o JS mostra um aviso e
-   leva o visitante para o **WhatsApp** da agência (fallback), para não perder
-   o lead.
+O painel é uma página web responsiva e autocontida. Formas comuns de usar como
+uma **tela dentro do web app**:
 
-Formato esperado da resposta da ponte (qualquer um destes serve):
+- **Rota/iframe:** sirva `index.php` e aponte uma tela do app para essa URL
+  (ex.: `/agente` ou um `<iframe>` na área do cliente).
+- **PWA/hospedagem:** publique a pasta em qualquer host com PHP 7.4+.
 
-```json
-{ "checkout_url": "https://pagamento..." }
-{ "url": "https://pagamento..." }
-{ "ok": true, "link": "https://pagamento..." }
-```
+Todos os botões principais abrem o WhatsApp do agente com uma mensagem
+pré-preenchida — nenhuma chamada de servidor é necessária.
 
 ## Configuração (`config.php`)
 
 | O que ajustar | Onde |
 |---|---|
-| Backend que gera trial/checkout | `PONTE_URL` (ou variável de ambiente `PONTE_URL`) |
-| WhatsApp da agência | `$AGENCIA['whatsapp']` (DDI+DDD+número, só dígitos) |
+| WhatsApp do agente | `$AGENCIA['whatsapp']` (DDI+DDD+número, só dígitos) |
 | E-mail e Instagram | `$AGENCIA['email']`, `$AGENCIA['instagram']` |
-| Preços, créditos e recursos dos planos | `$PLANOS[...]` |
-
-A `PONTE_URL` pode (e **deve**, em produção) vir de variável de ambiente:
-
-```bash
-# Apache (.htaccess ou vhost)
-SetEnv PONTE_URL "https://backend.agenciacavalcante.com.br"
-```
+| Nome/marca/descrição | `$AGENCIA[...]` |
+| Mensagem inicial do WhatsApp | `$WHATS_MSG_PADRAO` |
 
 ## Rodando localmente
 
@@ -71,29 +56,20 @@ php -S localhost:8000
 # abra http://localhost:8000
 ```
 
-Requer **PHP 7.4+** com a extensão **cURL** habilitada.
+Requer **PHP 7.4+**.
 
 ---
 
-## ✅ Antes de publicar (checklist)
+## ✅ Antes de entregar (checklist)
 
-Itens que dependem de dados reais da agência e precisam ser revistos antes de ir
-ao ar:
+- [ ] **WhatsApp real** em `config.php` — hoje está um número de exemplo
+      (`5511999999999`). É a única integração externa do painel.
+- [ ] **E-mail e Instagram** conferidos (aparecem no rodapé e na CTA final).
+- [ ] **Exemplos de uso**: a seção é ilustrativa. Ajuste os segmentos para os do
+      cliente, se quiser.
+- [ ] (Opcional) **Compartilhamento**: no `<head>` do `index.php` há um bloco
+      comentado para `og:image`/`canonical` caso o painel também seja acessado
+      por link público.
 
-- [ ] **WhatsApp real** em `config.php` (`$AGENCIA['whatsapp']`) — hoje está um
-      número de exemplo (`5511999999999`).
-- [ ] **Backend de produção** em `PONTE_URL` — o padrão atual é um túnel `ngrok`
-      de desenvolvimento e **vai cair**. Aponte para o domínio definitivo ou
-      defina a variável de ambiente `PONTE_URL`.
-- [ ] **E-mail e Instagram** conferidos e ativos (`config.php`).
-- [ ] **Preços e créditos** dos planos revisados (`$PLANOS`). O rótulo mostra o
-      valor mensal e o total trimestral cobrado — mantenha os dois coerentes.
-- [ ] **Depoimentos**: a seção "Exemplos de uso" é ilustrativa. Se quiser provas
-      sociais reais, substitua por depoimentos de clientes **com autorização**.
-- [ ] **Compartilhamento (SEO/redes)**: no `<head>` do `index.php` há um bloco
-      comentado — defina o domínio real e uma imagem `og:image` (1200×630) e o
-      `canonical`.
-- [ ] **Cidade/UF** em `config.php` (`$AGENCIA['cidade']`), se for usar.
-
-> Evite afirmações que não dá para comprovar (ex.: "aprovado/certificado pela
-> Meta", estatísticas sem fonte). Os textos atuais já foram ajustados para isso.
+> Observação: o histórico do Git ainda guarda a versão anterior com planos e
+> checkout (`trial.php`/`voucher.php`), caso um dia você queira reaproveitar.

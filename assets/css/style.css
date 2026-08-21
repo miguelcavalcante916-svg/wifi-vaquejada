@@ -489,6 +489,23 @@ p { margin: 0; }
 .caso__title { font-family: var(--font-head); font-size: 1.15rem; margin: 0 0 .5rem; }
 .caso p { margin: 0; color: var(--muted); font-size: .98rem; }
 
+/* Status pill (cabeçalho do painel) */
+.status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px; border-radius: 999px;
+    background: rgba(37, 211, 102, .12); border: 1px solid rgba(37, 211, 102, .35);
+    color: var(--green); font-size: .82rem; font-weight: 600; white-space: nowrap;
+}
+.status-pill__dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 0 0 rgba(37, 211, 102, .5); animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(37, 211, 102, .5); }
+    70%  { box-shadow: 0 0 0 7px rgba(37, 211, 102, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+
 /* Acessibilidade */
 .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -605,7 +622,7 @@ p { margin: 0; }
 }
 
 @media (max-width: 720px) {
-    .nav, .header__actions .btn--ghost { display: none; }
+    .nav, .header__actions .status-pill { display: none; }
     .nav-toggle { display: flex; }
     .nav.is-open {
         display: flex;
