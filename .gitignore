@@ -1,0 +1,3 @@
+# Configuração local salva pela aba Configurações do painel.
+# Contém a senha (hash) e a chave da IA — NUNCA versionar.
+dados/

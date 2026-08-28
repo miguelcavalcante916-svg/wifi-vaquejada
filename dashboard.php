@@ -2,13 +2,154 @@
 /**
  * dashboard.php — Painel do cliente (Agente de IA no WhatsApp).
  *
- * Abas: Visão geral, Conversas, Pipeline, Agente IA (chat integrado).
+ * Abas: Visão geral, Conversas, Pipeline, Agente IA (chat integrado) e
+ * Configurações (protegida por senha — salva em dados/config.local.php).
  * Os números e conversas exibidos são DADOS DE DEMONSTRAÇÃO — em produção,
  * este painel deve ler os dados reais do backend da agência.
  */
+if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax']);
+    session_start();
+}
 require __DIR__ . '/config.php';
 
-$iaConfigurada = (getenv('IA_API_KEY') ?: getenv('ANTHROPIC_API_KEY') ?: '') !== '';
+$cfgLocal = config_local_carregar();
+$temSenha = !empty($cfgLocal['senha_hash']);
+$logado   = !empty($_SESSION['cfg_ok']);
+if (empty($_SESSION['cfg_csrf'])) {
+    $_SESSION['cfg_csrf'] = bin2hex(random_bytes(16));
+}
+$csrf = $_SESSION['cfg_csrf'];
+
+/** Guarda a mensagem e volta para a aba Configurações (POST → redirect → GET). */
+function cfg_flash($msg, $erro = false) {
+    $_SESSION['cfg_msg'] = [$msg, (bool) $erro];
+    header('Location: dashboard.php#config');
+    exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $acao = (string) ($_POST['acao'] ?? '');
+    if (!hash_equals($csrf, (string) ($_POST['csrf'] ?? ''))) {
+        cfg_flash('Sessão expirada — recarregue a página e tente de novo.', true);
+    }
+
+    if ($acao === 'sair') {
+        unset($_SESSION['cfg_ok']);
+        cfg_flash('Você saiu das configurações.');
+    }
+
+    if ($acao === 'criar_senha' && !$temSenha) {
+        $s1 = (string) ($_POST['senha'] ?? '');
+        $s2 = (string) ($_POST['senha2'] ?? '');
+        if (strlen($s1) < 8) {
+            cfg_flash('A senha precisa ter pelo menos 8 caracteres.', true);
+        }
+        if ($s1 !== $s2) {
+            cfg_flash('As duas senhas não conferem.', true);
+        }
+        $cfgLocal['senha_hash'] = password_hash($s1, PASSWORD_DEFAULT);
+        if (!config_local_salvar($cfgLocal)) {
+            cfg_flash('Não consegui gravar na pasta dados/ — verifique as permissões no servidor.', true);
+        }
+        $_SESSION['cfg_ok'] = true;
+        cfg_flash('Senha criada! Agora configure o sistema abaixo.');
+    }
+
+    if ($acao === 'entrar' && $temSenha && !$logado) {
+        usleep(400000); // desacelera tentativas de adivinhação
+        if (password_verify((string) ($_POST['senha'] ?? ''), (string) $cfgLocal['senha_hash'])) {
+            $_SESSION['cfg_ok'] = true;
+            cfg_flash('Bem-vindo de volta!');
+        }
+        cfg_flash('Senha incorreta.', true);
+    }
+
+    if ($acao === 'salvar' && $logado) {
+        $whats = preg_replace('/\D+/', '', (string) ($_POST['whatsapp'] ?? ''));
+        if ($whats !== '') {
+            if (strlen($whats) < 10 || strlen($whats) > 15) {
+                cfg_flash('WhatsApp inválido — use DDI+DDD+número, ex.: 5584999492725.', true);
+            }
+            $cfgLocal['whatsapp'] = $whats;
+        }
+
+        $email = trim((string) ($_POST['email'] ?? ''));
+        if ($email !== '') {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                cfg_flash('E-mail inválido.', true);
+            }
+            $cfgLocal['email'] = $email;
+        }
+
+        $insta = trim((string) ($_POST['instagram'] ?? ''));
+        if ($insta !== '') {
+            if (!preg_match('#^https?://#i', $insta)) {
+                $insta = 'https://instagram.com/' . ltrim($insta, '@/');
+            }
+            if (!filter_var($insta, FILTER_VALIDATE_URL)) {
+                cfg_flash('Instagram inválido — use o @usuário ou o link completo.', true);
+            }
+            $cfgLocal['instagram'] = $insta;
+        }
+
+        $cidade = trim((string) ($_POST['cidade'] ?? ''));
+        if ($cidade !== '') {
+            $cfgLocal['cidade'] = mb_substr($cidade, 0, 60);
+        }
+
+        $ponte = trim((string) ($_POST['ponte_url'] ?? ''));
+        if ($ponte !== '') {
+            if (!filter_var($ponte, FILTER_VALIDATE_URL) || !preg_match('#^https?://#i', $ponte)) {
+                cfg_flash('URL do backend inválida — comece com https://', true);
+            }
+            $cfgLocal['ponte_url'] = rtrim($ponte, '/');
+        }
+
+        // Chave da IA: em branco mantém a atual; "remover" apaga.
+        if (!empty($_POST['ia_remover'])) {
+            unset($cfgLocal['ia_api_key']);
+        } else {
+            $chaveNova = trim((string) ($_POST['ia_api_key'] ?? ''));
+            if ($chaveNova !== '') {
+                $cfgLocal['ia_api_key'] = $chaveNova;
+            }
+        }
+
+        foreach ([1, 2, 3] as $pid) {
+            $preco = (int) ($_POST['preco_' . $pid] ?? 0);
+            $cred  = trim((string) ($_POST['creditos_' . $pid] ?? ''));
+            if ($preco > 0) {
+                $cfgLocal['planos'][(string) $pid]['preco'] = $preco;
+            }
+            if ($cred !== '') {
+                $cfgLocal['planos'][(string) $pid]['creditos'] = mb_substr($cred, 0, 80);
+            }
+        }
+
+        $novaSenha = (string) ($_POST['nova_senha'] ?? '');
+        if ($novaSenha !== '') {
+            if (strlen($novaSenha) < 8) {
+                cfg_flash('A nova senha precisa ter pelo menos 8 caracteres.', true);
+            }
+            $cfgLocal['senha_hash'] = password_hash($novaSenha, PASSWORD_DEFAULT);
+        }
+
+        if (!config_local_salvar($cfgLocal)) {
+            cfg_flash('Não consegui gravar na pasta dados/ — verifique as permissões no servidor.', true);
+        }
+        cfg_flash('Configurações salvas! O site e o agente já estão usando os novos dados.');
+    }
+
+    cfg_flash('Ação inválida.', true);
+}
+
+$cfgMsg = $_SESSION['cfg_msg'] ?? null;
+unset($_SESSION['cfg_msg']);
+
+$iaConfigurada = ia_chave() !== '';
+$iaViaEnv      = (bool) (getenv('IA_API_KEY') ?: getenv('ANTHROPIC_API_KEY'));
+$iaViaPainel   = !$iaViaEnv && !empty($cfgLocal['ia_api_key']);
 
 // ---------------------------------------------------------------------------
 // Dados de demonstração
@@ -107,6 +248,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
         <a href="#conversas" class="dash-nav__item" data-tab="conversas">💬 <span>Conversas</span></a>
         <a href="#pipeline" class="dash-nav__item" data-tab="pipeline">🧭 <span>Pipeline</span></a>
         <a href="#agente" class="dash-nav__item" data-tab="agente">🤖 <span>Agente IA</span></a>
+        <a href="#config" class="dash-nav__item" data-tab="config">⚙️ <span>Configurações</span></a>
     </nav>
 
     <main id="conteudo" class="dash-main">
@@ -267,9 +409,9 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
                 <h2 class="dash-h2">Como funciona</h2>
                 <p class="dash-note">Este é o mesmo cérebro que atende no seu WhatsApp. Teste perguntas reais dos seus clientes: preços, horários, agendamento…</p>
                 <?php if (!$iaConfigurada): ?>
-                <p class="dash-note dash-note--warn">⚠ Rodando em <strong>modo demonstração</strong> (respostas pré-programadas). Para ativar a IA real, defina a variável de ambiente <code>IA_API_KEY</code> com uma chave da Anthropic — instruções no README.</p>
+                <p class="dash-note dash-note--warn">⚠ Rodando em <strong>modo demonstração</strong> (respostas pré-programadas). Para ativar a IA real, cole sua chave da Anthropic na aba <a href="#config">⚙️ Configurações</a>.</p>
                 <?php else: ?>
-                <p class="dash-note">✅ IA real conectada via API da Anthropic.</p>
+                <p class="dash-note">✅ IA real conectada via API da Anthropic<?= $iaViaPainel ? ' (chave salva nas Configurações)' : '' ?>.</p>
                 <?php endif; ?>
                 <h2 class="dash-h2">Sugestões para testar</h2>
                 <div class="ia-sugestoes">
@@ -280,6 +422,135 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
                 </div>
             </div>
         </div>
+    </section>
+
+    <!-- ============ CONFIGURAÇÕES ============ -->
+    <section class="dash-tab" id="config" aria-labelledby="h-config">
+        <h1 id="h-config" class="dash-h1">⚙️ Configurações</h1>
+
+        <?php if ($cfgMsg): ?>
+        <p class="cfg-msg<?= $cfgMsg[1] ? ' cfg-msg--erro' : '' ?>" role="status"><?= htmlspecialchars($cfgMsg[0]) ?></p>
+        <?php endif; ?>
+
+        <?php if (!$temSenha): ?>
+        <!-- Primeiro acesso: criar a senha -->
+        <div class="dash-card cfg-card">
+            <h2 class="dash-h2">Primeiro acesso — crie sua senha</h2>
+            <p class="dash-note">Esta senha protege as configurações do sistema. <strong>Defina-a assim que publicar o site</strong>, antes de divulgar o endereço.</p>
+            <form method="post" class="cfg-form">
+                <input type="hidden" name="acao" value="criar_senha">
+                <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+                <label>Senha (mínimo 8 caracteres)
+                    <input type="password" name="senha" minlength="8" required autocomplete="new-password">
+                </label>
+                <label>Repita a senha
+                    <input type="password" name="senha2" minlength="8" required autocomplete="new-password">
+                </label>
+                <button type="submit" class="btn btn--primary">Criar senha e entrar</button>
+            </form>
+        </div>
+
+        <?php elseif (!$logado): ?>
+        <!-- Login -->
+        <div class="dash-card cfg-card">
+            <h2 class="dash-h2">Entrar nas configurações</h2>
+            <form method="post" class="cfg-form">
+                <input type="hidden" name="acao" value="entrar">
+                <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+                <label>Senha
+                    <input type="password" name="senha" required autocomplete="current-password">
+                </label>
+                <button type="submit" class="btn btn--primary">Entrar</button>
+            </form>
+        </div>
+
+        <?php else: ?>
+        <!-- Formulário de configurações -->
+        <form method="post" class="cfg-grade">
+            <input type="hidden" name="acao" value="salvar">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+
+            <div class="dash-card">
+                <h2 class="dash-h2">📱 Dados da agência</h2>
+                <div class="cfg-form">
+                    <label>WhatsApp do agente (DDI+DDD+número, só dígitos)
+                        <input type="text" name="whatsapp" inputmode="numeric" value="<?= htmlspecialchars($AGENCIA['whatsapp']) ?>">
+                    </label>
+                    <label>E-mail de contato
+                        <input type="email" name="email" value="<?= htmlspecialchars($AGENCIA['email']) ?>">
+                    </label>
+                    <label>Instagram (@usuário ou link)
+                        <input type="text" name="instagram" value="<?= htmlspecialchars($AGENCIA['instagram']) ?>">
+                    </label>
+                    <label>Cidade/UF (opcional)
+                        <input type="text" name="cidade" maxlength="60" value="<?= htmlspecialchars($AGENCIA['cidade']) ?>" placeholder="ex.: Natal - RN">
+                    </label>
+                </div>
+            </div>
+
+            <div class="dash-card">
+                <h2 class="dash-h2">🤖 Inteligência Artificial</h2>
+                <?php if ($iaViaEnv): ?>
+                <p class="dash-note">✅ Chave definida por <strong>variável de ambiente</strong> no servidor (tem prioridade sobre este campo).</p>
+                <?php elseif ($iaViaPainel): ?>
+                <p class="dash-note">✅ IA ativa com a chave salva aqui: <code>•••• <?= htmlspecialchars(substr((string) $cfgLocal['ia_api_key'], -4)) ?></code></p>
+                <?php else: ?>
+                <p class="dash-note dash-note--warn">⚠ Sem chave — o chat do agente roda em modo demonstração. Crie a sua em <strong>console.anthropic.com</strong> (API Keys) e cole abaixo.</p>
+                <?php endif; ?>
+                <div class="cfg-form">
+                    <label>Chave da API da Anthropic (deixe em branco para manter a atual)
+                        <input type="password" name="ia_api_key" autocomplete="off" placeholder="sk-ant-...">
+                    </label>
+                    <?php if ($iaViaPainel): ?>
+                    <label class="cfg-check"><input type="checkbox" name="ia_remover" value="1"> Remover a chave salva (volta ao modo demonstração)</label>
+                    <?php endif; ?>
+                </div>
+                <h2 class="dash-h2" style="margin-top:18px">🔗 Backend de checkout (ponte)</h2>
+                <div class="cfg-form">
+                    <label>URL do serviço que gera trials e links de pagamento
+                        <input type="url" name="ponte_url" value="<?= htmlspecialchars(getenv('PONTE_URL') ?: ($cfgLocal['ponte_url'] ?? '')) ?>" placeholder="<?= htmlspecialchars(PONTE_URL) ?>">
+                    </label>
+                </div>
+            </div>
+
+            <div class="dash-card">
+                <h2 class="dash-h2">💰 Planos</h2>
+                <div class="cfg-planos">
+                    <?php foreach ($PLANOS as $p): ?>
+                    <fieldset class="cfg-plano">
+                        <legend><?= htmlspecialchars($p['nome']) ?></legend>
+                        <label>Preço mensal (R$)
+                            <input type="number" name="preco_<?= (int) $p['plano'] ?>" min="1" step="1" value="<?= (int) $p['preco'] ?>">
+                        </label>
+                        <label>Créditos de IA
+                            <input type="text" name="creditos_<?= (int) $p['plano'] ?>" maxlength="80" value="<?= htmlspecialchars($p['creditos']) ?>">
+                        </label>
+                    </fieldset>
+                    <?php endforeach; ?>
+                </div>
+                <p class="dash-note">O total trimestral exibido no site é recalculado automaticamente (preço × 3).</p>
+            </div>
+
+            <div class="dash-card">
+                <h2 class="dash-h2">🔒 Trocar senha (opcional)</h2>
+                <div class="cfg-form">
+                    <label>Nova senha (deixe em branco para manter)
+                        <input type="password" name="nova_senha" minlength="8" autocomplete="new-password">
+                    </label>
+                </div>
+            </div>
+
+            <div class="cfg-acoes">
+                <button type="submit" class="btn btn--primary btn--lg">Salvar configurações</button>
+            </div>
+        </form>
+
+        <form method="post" class="cfg-sair">
+            <input type="hidden" name="acao" value="sair">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <button type="submit" class="btn btn--outline btn--sm">Sair das configurações</button>
+        </form>
+        <?php endif; ?>
     </section>
 
     </main>

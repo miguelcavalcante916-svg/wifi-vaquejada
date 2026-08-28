@@ -2,17 +2,63 @@
 /**
  * Agência Cavalcante — Configuração central
  *
- * Ajuste aqui os dados da agência, a URL do backend ("ponte") e os planos.
- * Nenhuma chave secreta deve ficar neste arquivo — apenas configuração pública.
+ * Os valores abaixo são os PADRÕES. Tudo que for salvo pela aba
+ * Configurações do painel (dashboard.php) fica em dados/config.local.php
+ * e sobrepõe os padrões. Nenhuma chave secreta fica neste arquivo.
  */
+
+// ----------------------------------------------------------------------------
+// Configuração local (salva pelo painel, no navegador)
+// ----------------------------------------------------------------------------
+function config_local_arquivo() {
+    return __DIR__ . '/dados/config.local.php';
+}
+
+function config_local_carregar() {
+    $arq = config_local_arquivo();
+    if (is_file($arq)) {
+        $d = include $arq;
+        if (is_array($d)) {
+            return $d;
+        }
+    }
+    return [];
+}
+
+/** Grava a configuração local. Retorna true em caso de sucesso. */
+function config_local_salvar(array $dados) {
+    $dir = dirname(config_local_arquivo());
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+        return false;
+    }
+    // Defesa extra em Apache; o próprio .php já não expõe o conteúdo por HTTP.
+    @file_put_contents($dir . '/.htaccess', "Require all denied\n");
+    $php = "<?php\n// Gerado pela aba Configurações do painel — não editar à mão.\nreturn "
+        . var_export($dados, true) . ";\n";
+    return @file_put_contents(config_local_arquivo(), $php, LOCK_EX) !== false;
+}
+
+$CONFIG_LOCAL = config_local_carregar();
+
+/** Chave da API de IA: variável de ambiente tem prioridade sobre o painel. */
+function ia_chave() {
+    $env = getenv('IA_API_KEY') ?: getenv('ANTHROPIC_API_KEY');
+    if ($env) {
+        return $env;
+    }
+    $local = config_local_carregar();
+    return (string) ($local['ia_api_key'] ?? '');
+}
 
 // ----------------------------------------------------------------------------
 // Backend / Ponte
 // ----------------------------------------------------------------------------
 // Endereço do serviço que gera trials e links de checkout (voucher).
-// Pode ser sobrescrito por variável de ambiente PONTE_URL no servidor.
+// Prioridade: variável de ambiente PONTE_URL > painel > padrão.
 if (!defined('PONTE_URL')) {
-    define('PONTE_URL', getenv('PONTE_URL') ?: 'https://lavinia-nonremissible-les.ngrok-free.dev');
+    define('PONTE_URL', getenv('PONTE_URL')
+        ?: (!empty($CONFIG_LOCAL['ponte_url']) ? $CONFIG_LOCAL['ponte_url']
+            : 'https://lavinia-nonremissible-les.ngrok-free.dev'));
 }
 
 // Timeout (segundos) das chamadas ao backend.
@@ -31,9 +77,16 @@ $AGENCIA = [
     'whatsapp'    => '5584999492725', // DDI+DDD+numero, apenas dígitos
     'email'       => 'contato@agenciacavalcante.com.br',
     'instagram'   => 'https://instagram.com/agenciacavalcante',
-    'cidade'      => '', // cidade/UF da agência, ex.: 'Recife - PE'
+    'cidade'      => '', // cidade/UF da agência, ex.: 'Natal - RN'
     'ano'         => (int) date('Y'),
 ];
+
+// O que foi salvo pelo painel sobrepõe os padrões acima.
+foreach (['whatsapp', 'email', 'instagram', 'cidade'] as $campo) {
+    if (!empty($CONFIG_LOCAL[$campo]) && is_string($CONFIG_LOCAL[$campo])) {
+        $AGENCIA[$campo] = $CONFIG_LOCAL[$campo];
+    }
+}
 
 // Mensagem padrão usada quando o visitante fala com a agência pelo WhatsApp.
 $WHATS_MSG_PADRAO = 'Olá! Vim pelo site da Agência Cavalcante e quero conhecer o Agente de IA para WhatsApp.';
@@ -108,6 +161,22 @@ $PLANOS = [
         ],
     ],
 ];
+
+// Preços/créditos salvos pelo painel sobrepõem os padrões; o total
+// trimestral exibido é recalculado a partir do preço vigente.
+foreach ($PLANOS as $i => $p) {
+    $ov = $CONFIG_LOCAL['planos'][(string) $p['plano']] ?? null;
+    if (is_array($ov)) {
+        if (isset($ov['preco']) && (int) $ov['preco'] > 0) {
+            $PLANOS[$i]['preco'] = (int) $ov['preco'];
+        }
+        if (!empty($ov['creditos']) && is_string($ov['creditos'])) {
+            $PLANOS[$i]['creditos'] = $ov['creditos'];
+        }
+        $PLANOS[$i]['cobranca'] = 'cobrança trimestral — R$ '
+            . number_format($PLANOS[$i]['preco'] * 3, 0, ',', '.') . ' a cada 3 meses';
+    }
+}
 
 /**
  * Retorna um plano pelo identificador, ou null.

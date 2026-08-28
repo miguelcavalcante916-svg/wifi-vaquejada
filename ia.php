@@ -75,7 +75,7 @@ if (!$mensagens || end($mensagens)['de'] !== 'cliente') {
     exit;
 }
 
-$chave = getenv('IA_API_KEY') ?: getenv('ANTHROPIC_API_KEY') ?: '';
+$chave = ia_chave(); // variável de ambiente ou chave salva na aba Configurações
 
 if ($chave !== '') {
     $resposta = ia_responder_anthropic($chave, $mensagens, $AGENCIA, $PLANOS);

@@ -47,6 +47,34 @@ Acessível em `/dashboard.php` (link no rodapé do site). Abas:
 - **Pipeline** — funil kanban: novo lead → qualificação → qualificado →
   reunião marcada → fechado.
 - **Agente IA** — chat funcional com o agente (veja abaixo).
+- **⚙️ Configurações** — configure TUDO pelo navegador (veja abaixo).
+
+## ⚙️ Configurações pelo navegador
+
+A aba **Configurações** do painel permite configurar o sistema inteiro pelo
+Chrome, sem tocar em código:
+
+- WhatsApp, e-mail, Instagram e cidade da agência
+- URL do backend de checkout (`ponte`)
+- **Chave da API da Anthropic** (ativa a IA real do chat)
+- Preço e créditos de cada plano (o total trimestral do site é recalculado
+  automaticamente)
+
+Como funciona:
+
+1. **Primeira visita** à aba: você cria uma senha. ⚠ **Faça isso assim que
+   publicar o site**, antes de divulgar o endereço.
+2. Depois, a aba pede a senha para entrar.
+3. Tudo que você salvar vale imediatamente no site e no agente.
+
+Onde os dados ficam: em `dados/config.local.php` — arquivo **fora do Git**
+(`.gitignore`), que não expõe nada se acessado por URL, com a senha guardada
+como hash e a chave da IA nunca reexibida (só os 4 últimos dígitos).
+Variáveis de ambiente (`PONTE_URL`, `IA_API_KEY`), quando existirem no
+servidor, têm prioridade sobre o painel.
+
+> A pasta `dados/` precisa de permissão de escrita pelo PHP (na maioria das
+> hospedagens compartilhadas isso já funciona sem ajuste).
 
 > Os números e conversas do painel são **dados de demonstração** (rotulados
 > como tal na interface). Em produção, conecte às fontes reais da agência.
