@@ -7,6 +7,15 @@
  * e sobrepõe os padrões. Nenhuma chave secreta fica neste arquivo.
  */
 
+// Hospedagens compartilhadas nem sempre têm mbstring; degrada para substr
+// (pode partir um caractere multibyte no corte, aceitável para sanitização).
+if (!function_exists('mb_substr')) {
+    function mb_substr($s, $i, $l = null) { return $l === null ? substr($s, $i) : substr($s, $i, $l); }
+    function mb_strtolower($s) { return strtolower($s); }
+    function mb_strpos($h, $n) { return strpos($h, $n); }
+    function mb_strlen($s) { return strlen($s); }
+}
+
 // ----------------------------------------------------------------------------
 // Configuração local (salva pelo painel, no navegador)
 // ----------------------------------------------------------------------------
@@ -28,14 +37,18 @@ function config_local_carregar() {
 /** Grava a configuração local. Retorna true em caso de sucesso. */
 function config_local_salvar(array $dados) {
     $dir = dirname(config_local_arquivo());
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
         return false;
     }
     // Defesa extra em Apache; o próprio .php já não expõe o conteúdo por HTTP.
     @file_put_contents($dir . '/.htaccess', "Require all denied\n");
     $php = "<?php\n// Gerado pela aba Configurações do painel — não editar à mão.\nreturn "
         . var_export($dados, true) . ";\n";
-    return @file_put_contents(config_local_arquivo(), $php, LOCK_EX) !== false;
+    if (@file_put_contents(config_local_arquivo(), $php, LOCK_EX) === false) {
+        return false;
+    }
+    @chmod(config_local_arquivo(), 0600); // contém hash de senha e chave da IA
+    return true;
 }
 
 $CONFIG_LOCAL = config_local_carregar();

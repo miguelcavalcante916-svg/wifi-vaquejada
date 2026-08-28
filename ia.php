@@ -12,16 +12,7 @@
  * Resposta: { "ok": true, "resposta": "...", "modo": "ia"|"demo" }
  */
 
-require __DIR__ . '/config.php';
-
-// Hospedagens compartilhadas nem sempre têm mbstring; degrada para substr
-// (pode partir um caractere multibyte no corte, aceitável para sanitização).
-if (!function_exists('mb_substr')) {
-    function mb_substr($s, $i, $l = null) { return $l === null ? substr($s, $i) : substr($s, $i, $l); }
-    function mb_strtolower($s) { return strtolower($s); }
-    function mb_strpos($h, $n) { return strpos($h, $n); }
-    function mb_strlen($s) { return strlen($s); }
-}
+require __DIR__ . '/config.php'; // inclui o shim de mbstring
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -77,6 +68,17 @@ if (!$mensagens || end($mensagens)['de'] !== 'cliente') {
 
 $chave = ia_chave(); // variável de ambiente ou chave salva na aba Configurações
 
+// Com chave real configurada, limita mensagens por IP para proteger os
+// créditos (o gate de origem acima só barra navegadores de outros sites).
+if ($chave !== '' && !ia_rate_ok($_SERVER['REMOTE_ADDR'] ?? '?', 30, 3600)) {
+    echo json_encode([
+        'ok'       => true,
+        'resposta' => 'Estou recebendo muitas mensagens suas agora 😅 Aguarde alguns minutos e me chame de novo!',
+        'modo'     => 'ia',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($chave !== '') {
     $resposta = ia_responder_anthropic($chave, $mensagens, $AGENCIA, $PLANOS);
     if ($resposta !== null) {
@@ -94,6 +96,39 @@ echo json_encode([
 exit;
 
 // ---------------------------------------------------------------------------
+
+/**
+ * Limitador simples por IP: permite $max mensagens a cada $janela segundos.
+ * Estado em dados/ia_rate.php (arquivo PHP que retorna array — nada vaza por
+ * HTTP). Corridas sob concorrência são toleráveis para este propósito.
+ */
+function ia_rate_ok($ip, $max, $janela) {
+    $arq = __DIR__ . '/dados/ia_rate.php';
+    $dir = dirname($arq);
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        return true; // sem onde gravar, não bloqueia o chat
+    }
+    $agora = time();
+    $dados = is_file($arq) ? @include $arq : [];
+    if (!is_array($dados)) {
+        $dados = [];
+    }
+    // descarta janelas vencidas (também limita o tamanho do arquivo)
+    foreach ($dados as $k => $v) {
+        if (!is_array($v) || ($agora - ($v[0] ?? 0)) > $janela) {
+            unset($dados[$k]);
+        }
+    }
+    $atual = $dados[$ip] ?? [$agora, 0];
+    if (($agora - $atual[0]) > $janela) {
+        $atual = [$agora, 0];
+    }
+    $atual[1]++;
+    $dados[$ip] = $atual;
+    @file_put_contents($arq, "<?php\nreturn " . var_export($dados, true) . ";\n", LOCK_EX);
+    @chmod($arq, 0600);
+    return $atual[1] <= $max;
+}
 
 /**
  * Chama a API Messages da Anthropic (cURL nativo — o projeto não usa Composer;

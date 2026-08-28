@@ -8,7 +8,11 @@
  * este painel deve ler os dados reais do backend da agência.
  */
 if (session_status() === PHP_SESSION_NONE) {
-    session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax']);
+    session_set_cookie_params([
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure'   => !empty($_SERVER['HTTPS']),
+    ]);
     session_start();
 }
 require __DIR__ . '/config.php';
@@ -52,6 +56,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if (!config_local_salvar($cfgLocal)) {
             cfg_flash('Não consegui gravar na pasta dados/ — verifique as permissões no servidor.', true);
         }
+        session_regenerate_id(true); // evita fixação de sessão
+        $_SESSION['cfg_csrf'] = bin2hex(random_bytes(16));
         $_SESSION['cfg_ok'] = true;
         cfg_flash('Senha criada! Agora configure o sistema abaixo.');
     }
@@ -59,6 +65,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if ($acao === 'entrar' && $temSenha && !$logado) {
         usleep(400000); // desacelera tentativas de adivinhação
         if (password_verify((string) ($_POST['senha'] ?? ''), (string) $cfgLocal['senha_hash'])) {
+            session_regenerate_id(true); // evita fixação de sessão
+            $_SESSION['cfg_csrf'] = bin2hex(random_bytes(16));
             $_SESSION['cfg_ok'] = true;
             cfg_flash('Bem-vindo de volta!');
         }
@@ -66,45 +74,54 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     }
 
     if ($acao === 'salvar' && $logado) {
+        // Valida TODOS os campos antes de gravar qualquer coisa, acumulando
+        // os erros — assim o usuário corrige tudo de uma vez.
+        $erros = [];
+
         $whats = preg_replace('/\D+/', '', (string) ($_POST['whatsapp'] ?? ''));
-        if ($whats !== '') {
-            if (strlen($whats) < 10 || strlen($whats) > 15) {
-                cfg_flash('WhatsApp inválido — use DDI+DDD+número, ex.: 5584999492725.', true);
-            }
-            $cfgLocal['whatsapp'] = $whats;
+        if ($whats !== '' && (strlen($whats) < 10 || strlen($whats) > 15)) {
+            $erros[] = 'WhatsApp inválido — use DDI+DDD+número, ex.: 5584999492725.';
         }
 
         $email = trim((string) ($_POST['email'] ?? ''));
-        if ($email !== '') {
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                cfg_flash('E-mail inválido.', true);
-            }
-            $cfgLocal['email'] = $email;
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $erros[] = 'E-mail inválido.';
         }
 
         $insta = trim((string) ($_POST['instagram'] ?? ''));
-        if ($insta !== '') {
-            if (!preg_match('#^https?://#i', $insta)) {
-                $insta = 'https://instagram.com/' . ltrim($insta, '@/');
-            }
-            if (!filter_var($insta, FILTER_VALIDATE_URL)) {
-                cfg_flash('Instagram inválido — use o @usuário ou o link completo.', true);
-            }
-            $cfgLocal['instagram'] = $insta;
+        if ($insta !== '' && !preg_match('#^https?://#i', $insta)) {
+            // aceita "instagram.com/usuario" ou só "@usuario"
+            $insta = preg_match('#^(www\.)?instagram\.com/#i', $insta)
+                ? 'https://' . $insta
+                : 'https://instagram.com/' . ltrim($insta, '@/');
+        }
+        if ($insta !== '' && !filter_var($insta, FILTER_VALIDATE_URL)) {
+            $erros[] = 'Instagram inválido — use o @usuário ou o link completo.';
         }
 
         $cidade = trim((string) ($_POST['cidade'] ?? ''));
-        if ($cidade !== '') {
-            $cfgLocal['cidade'] = mb_substr($cidade, 0, 60);
-        }
 
         $ponte = trim((string) ($_POST['ponte_url'] ?? ''));
-        if ($ponte !== '') {
-            if (!filter_var($ponte, FILTER_VALIDATE_URL) || !preg_match('#^https?://#i', $ponte)) {
-                cfg_flash('URL do backend inválida — comece com https://', true);
-            }
-            $cfgLocal['ponte_url'] = rtrim($ponte, '/');
+        if ($ponte !== '' && (!filter_var($ponte, FILTER_VALIDATE_URL) || !preg_match('#^https?://#i', $ponte))) {
+            $erros[] = 'URL do backend inválida — comece com https://';
         }
+
+        $novaSenha = (string) ($_POST['nova_senha'] ?? '');
+        if ($novaSenha !== '' && strlen($novaSenha) < 8) {
+            $erros[] = 'A nova senha precisa ter pelo menos 8 caracteres.';
+        }
+
+        if ($erros) {
+            cfg_flash('Nada foi salvo. Corrija: ' . implode(' ', $erros), true);
+        }
+
+        // Tudo válido — aplica. Em branco mantém o atual (exceto os
+        // opcionais cidade e backend, que em branco voltam ao padrão).
+        if ($whats !== '') { $cfgLocal['whatsapp'] = $whats; }
+        if ($email !== '') { $cfgLocal['email'] = $email; }
+        if ($insta !== '') { $cfgLocal['instagram'] = $insta; }
+        if ($cidade !== '') { $cfgLocal['cidade'] = mb_substr($cidade, 0, 60); } else { unset($cfgLocal['cidade']); }
+        if ($ponte !== '') { $cfgLocal['ponte_url'] = rtrim($ponte, '/'); } else { unset($cfgLocal['ponte_url']); }
 
         // Chave da IA: em branco mantém a atual; "remover" apaga.
         if (!empty($_POST['ia_remover'])) {
@@ -127,11 +144,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             }
         }
 
-        $novaSenha = (string) ($_POST['nova_senha'] ?? '');
         if ($novaSenha !== '') {
-            if (strlen($novaSenha) < 8) {
-                cfg_flash('A nova senha precisa ter pelo menos 8 caracteres.', true);
-            }
             $cfgLocal['senha_hash'] = password_hash($novaSenha, PASSWORD_DEFAULT);
         }
 
@@ -141,6 +154,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         cfg_flash('Configurações salvas! O site e o agente já estão usando os novos dados.');
     }
 
+    if ($acao === 'salvar' && !$logado) {
+        cfg_flash('Você saiu das configurações em outra aba — entre novamente e salve de novo.', true);
+    }
+    if ($acao === 'criar_senha' && $temSenha) {
+        cfg_flash('A senha já foi criada — entre com ela abaixo.', true);
+    }
     cfg_flash('Ação inválida.', true);
 }
 
@@ -473,16 +492,16 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
             <div class="dash-card">
                 <h2 class="dash-h2">📱 Dados da agência</h2>
                 <div class="cfg-form">
-                    <label>WhatsApp do agente (DDI+DDD+número, só dígitos)
-                        <input type="text" name="whatsapp" inputmode="numeric" value="<?= htmlspecialchars($AGENCIA['whatsapp']) ?>">
+                    <label>WhatsApp do agente (DDI+DDD+número, só dígitos — em branco mantém o atual)
+                        <input type="text" name="whatsapp" inputmode="numeric" autocomplete="tel" value="<?= htmlspecialchars($AGENCIA['whatsapp']) ?>">
                     </label>
-                    <label>E-mail de contato
-                        <input type="email" name="email" value="<?= htmlspecialchars($AGENCIA['email']) ?>">
+                    <label>E-mail de contato (em branco mantém o atual)
+                        <input type="email" name="email" autocomplete="email" value="<?= htmlspecialchars($AGENCIA['email']) ?>">
                     </label>
-                    <label>Instagram (@usuário ou link)
-                        <input type="text" name="instagram" value="<?= htmlspecialchars($AGENCIA['instagram']) ?>">
+                    <label>Instagram (@usuário ou link — em branco mantém o atual)
+                        <input type="text" name="instagram" autocomplete="url" value="<?= htmlspecialchars($AGENCIA['instagram']) ?>">
                     </label>
-                    <label>Cidade/UF (opcional)
+                    <label>Cidade/UF (opcional — em branco remove)
                         <input type="text" name="cidade" maxlength="60" value="<?= htmlspecialchars($AGENCIA['cidade']) ?>" placeholder="ex.: Natal - RN">
                     </label>
                 </div>
@@ -499,16 +518,19 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
                 <?php endif; ?>
                 <div class="cfg-form">
                     <label>Chave da API da Anthropic (deixe em branco para manter a atual)
-                        <input type="password" name="ia_api_key" autocomplete="off" placeholder="sk-ant-...">
+                        <input type="password" name="ia_api_key" autocomplete="new-password" placeholder="sk-ant-...">
                     </label>
-                    <?php if ($iaViaPainel): ?>
-                    <label class="cfg-check"><input type="checkbox" name="ia_remover" value="1"> Remover a chave salva (volta ao modo demonstração)</label>
+                    <?php if (!empty($cfgLocal['ia_api_key'])): ?>
+                    <label class="cfg-check"><input type="checkbox" name="ia_remover" value="1"> Remover a chave salva neste painel</label>
                     <?php endif; ?>
                 </div>
                 <h2 class="dash-h2" style="margin-top:18px">🔗 Backend de checkout (ponte)</h2>
+                <?php if (getenv('PONTE_URL')): ?>
+                <p class="dash-note">ℹ Há uma URL definida por <strong>variável de ambiente</strong> no servidor — ela tem prioridade sobre este campo.</p>
+                <?php endif; ?>
                 <div class="cfg-form">
-                    <label>URL do serviço que gera trials e links de pagamento
-                        <input type="url" name="ponte_url" value="<?= htmlspecialchars(getenv('PONTE_URL') ?: ($cfgLocal['ponte_url'] ?? '')) ?>" placeholder="<?= htmlspecialchars(PONTE_URL) ?>">
+                    <label>URL do serviço que gera trials e links de pagamento (em branco volta ao padrão)
+                        <input type="url" name="ponte_url" value="<?= htmlspecialchars($cfgLocal['ponte_url'] ?? '') ?>" placeholder="<?= htmlspecialchars(PONTE_URL) ?>">
                     </label>
                 </div>
             </div>

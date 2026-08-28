@@ -53,6 +53,8 @@
 .dash-main { min-width: 0; }
 .dash-tab { display: none; }
 .dash-tab.is-active, .dash-tab:target { display: block; } /* :target = fallback sem JS */
+/* Sem JS, evita duas abas empilhadas quando o hash aponta para outra seção */
+.dash-main:has(.dash-tab:target) .dash-tab.is-active:not(:target) { display: none; }
 
 .dash-h1 { font-size: 1.5rem; margin-bottom: 20px; }
 .dash-h2 { font-size: 1.02rem; margin-bottom: 14px; color: var(--text); }
