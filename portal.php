@@ -7,6 +7,7 @@
  * administrativas (Clientes e Configurações).
  */
 if (session_status() === PHP_SESSION_NONE) {
+    session_name('cavpainel'); // não colide com o PHPSESSID de outro site no mesmo domínio
     session_set_cookie_params([
         'httponly' => true,
         'samesite' => 'Lax',
@@ -21,8 +22,12 @@ if (empty($_SESSION['cfg_csrf'])) {
 }
 $csrf = $_SESSION['cfg_csrf'];
 
-// Já está logado (cliente ou agência)? Vai direto ao painel.
-if ((!empty($_SESSION['cli_email']) && cliente_por_email($_SESSION['cli_email'])) || !empty($_SESSION['cfg_ok'])) {
+// Já está logado (cliente ou agência)? Vai direto ao painel. A sessão de
+// cliente só vale se o cadastro ainda existir com a MESMA senha.
+$cliAtual = !empty($_SESSION['cli_email']) ? cliente_por_email($_SESSION['cli_email']) : null;
+$cliValido = $cliAtual
+    && hash_equals((string) ($_SESSION['cli_marca'] ?? ''), sha1((string) ($cliAtual['hash'] ?? '')));
+if ($cliValido || !empty($_SESSION['cfg_ok'])) {
     header('Location: dashboard.php');
     exit;
 }
@@ -34,26 +39,65 @@ function portal_flash($msg, $erro = true) {
     exit;
 }
 
+/**
+ * Limite de tentativas de login por IP (15 a cada 15 minutos) — barra força
+ * bruta de senhas. Estado em dados/login_rate.php; sem onde gravar, não trava.
+ */
+function portal_taxa_ok($ip) {
+    $arq   = __DIR__ . '/dados/login_rate.php';
+    $agora = time();
+    $dados = is_file($arq) ? @include $arq : [];
+    if (!is_array($dados)) {
+        $dados = [];
+    }
+    foreach ($dados as $k => $v) {
+        if (!is_array($v) || ($agora - ($v[0] ?? 0)) > 900) {
+            unset($dados[$k]);
+        }
+    }
+    $atual = $dados[$ip] ?? [$agora, 0];
+    $atual[1]++;
+    $dados[$ip] = $atual;
+    dados_gravar($arq, "<?php\nreturn " . var_export($dados, true) . ";\n");
+    return $atual[1] <= 15;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if (!hash_equals($csrf, (string) ($_POST['csrf'] ?? ''))) {
         portal_flash('Sessão expirada — tente entrar de novo.');
     }
     usleep(400000); // desacelera tentativas de adivinhação
+    if (!portal_taxa_ok($_SERVER['REMOTE_ADDR'] ?? '?')) {
+        portal_flash('Muitas tentativas de login. Aguarde alguns minutos e tente de novo.');
+    }
     $email = mb_strtolower(trim((string) ($_POST['email'] ?? '')));
     $senha = (string) ($_POST['senha'] ?? '');
+    $_SESSION['portal_email'] = mb_substr($email, 0, 120); // reaparece no campo se der erro
+    $lista = clientes_carregar();
     $cli   = cliente_por_email($email);
-    if (!$cli || !password_verify($senha, (string) ($cli['hash'] ?? ''))) {
+    // O bcrypt roda SEMPRE, exista ou não o e-mail (contra o hash de outro
+    // cadastro ou um fantasma) — o tempo de resposta não revela quais
+    // e-mails são de clientes reais.
+    $hashCmp = $cli ? (string) ($cli['hash'] ?? '')
+        : ($lista ? (string) ($lista[0]['hash'] ?? '') : '$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy');
+    $senhaOk = password_verify($senha, $hashCmp);
+    if (!$cli || !$senhaOk) {
         portal_flash('E-mail ou senha incorretos. Confira os dados ou fale com a agência.');
     }
     session_regenerate_id(true); // evita fixação de sessão
     $_SESSION['cfg_csrf']  = bin2hex(random_bytes(16));
     $_SESSION['cli_email'] = mb_strtolower(trim((string) $cli['email']));
+    // Marca da senha vigente: se a agência trocar a senha, a sessão cai.
+    $_SESSION['cli_marca'] = sha1((string) ($cli['hash'] ?? ''));
+    unset($_SESSION['portal_email']);
     header('Location: dashboard.php');
     exit;
 }
 
 $msg = $_SESSION['portal_msg'] ?? null;
 unset($_SESSION['portal_msg']);
+$emailAnterior = (string) ($_SESSION['portal_email'] ?? '');
+unset($_SESSION['portal_email']);
 
 $whatsAcesso = 'https://wa.me/' . preg_replace('/\D+/', '', $AGENCIA['whatsapp'])
     . '?text=' . rawurlencode('Olá! Sou cliente da ' . $AGENCIA['nome'] . ' e preciso do meu acesso ao portal.');
@@ -97,7 +141,7 @@ $whatsAcesso = 'https://wa.me/' . preg_replace('/\D+/', '', $AGENCIA['whatsapp']
         <form method="post" class="cfg-form">
             <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
             <label>E-mail
-                <input type="email" name="email" required autocomplete="email" placeholder="voce@gmail.com">
+                <input type="email" name="email" required autocomplete="email" placeholder="voce@gmail.com" value="<?= htmlspecialchars($emailAnterior) ?>">
             </label>
             <label>Senha
                 <input type="password" name="senha" required autocomplete="current-password">

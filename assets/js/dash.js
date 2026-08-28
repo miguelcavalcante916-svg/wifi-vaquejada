@@ -103,7 +103,10 @@
           .catch(function () { throw new Error('HTTP ' + res.status); })
           .then(function (data) {
             if (!res.ok || !data || !data.ok || !data.resposta) {
-              throw new Error((data && data.erro) || ('HTTP ' + res.status));
+              var e = new Error((data && data.erro) || ('HTTP ' + res.status));
+              e.doServidor = !!(data && data.erro); // mensagem pronta em PT-BR
+              e.sessaoExpirada = res.status === 401;
+              throw e;
             }
             return data;
           });
@@ -118,11 +121,15 @@
       })
       .catch(function (err) {
         tip.remove();
-        // Mensagens de erro do servidor já vêm prontas em PT-BR (ex.: sessão
-        // expirada); erros de rede/HTTP ganham o texto genérico.
-        var doServidor = (err && err.message && err.message.indexOf('HTTP') !== 0 && err.message !== 'Failed to fetch')
-          ? err.message : null;
-        bolha('agente', doServidor || 'Ops, não consegui responder agora. Tente novamente em instantes.');
+        // Só mensagens vindas do servidor são exibidas ao usuário — os textos
+        // de erro de rede do navegador ("Failed to fetch", "Load failed"…)
+        // variam por browser e ficam no texto genérico.
+        bolha('agente', (err && err.doServidor)
+          ? err.message
+          : 'Ops, não consegui responder agora. Tente novamente em instantes.');
+        if (err && err.sessaoExpirada) {
+          setTimeout(function () { location.href = 'portal.php'; }, 2500);
+        }
       })
       .then(function () {
         clearTimeout(timeout);

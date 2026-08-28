@@ -34,24 +34,39 @@ function config_local_carregar() {
     return [];
 }
 
-/** Grava a configuração local. Retorna true em caso de sucesso. */
-function config_local_salvar(array $dados) {
-    $dir = dirname(config_local_arquivo());
-    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+/**
+ * Grava um arquivo PHP de dados na pasta dados/ de forma atômica (escreve em
+ * .tmp e renomeia): quem lê nunca enxerga um arquivo pela metade.
+ */
+function dados_gravar($arquivo, $php) {
+    $dir = dirname($arquivo);
+    // O teste extra de is_dir tolera duas requisições criando a pasta ao
+    // mesmo tempo (o mkdir de uma delas falha, mas a pasta existe).
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) {
         return false;
     }
     // Defesa extra em Apache; o próprio .php já não expõe o conteúdo por HTTP.
     @file_put_contents($dir . '/.htaccess', "Require all denied\n");
-    $php = "<?php\n// Gerado pela aba Configurações do painel — não editar à mão.\nreturn "
-        . var_export($dados, true) . ";\n";
-    if (@file_put_contents(config_local_arquivo(), $php, LOCK_EX) === false) {
+    $tmp = $arquivo . '.' . getmypid() . '.tmp';
+    if (@file_put_contents($tmp, $php, LOCK_EX) === false) {
         return false;
     }
-    @chmod(config_local_arquivo(), 0600); // contém hash de senha e chave da IA
+    @chmod($tmp, 0600); // hashes de senha e chave da IA
+    if (!@rename($tmp, $arquivo)) {
+        @unlink($tmp);
+        return false;
+    }
     if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate(config_local_arquivo(), true); // o include seguinte já vê o novo conteúdo
+        @opcache_invalidate($arquivo, true); // o include seguinte já vê o novo conteúdo
     }
     return true;
+}
+
+/** Grava a configuração local. Retorna true em caso de sucesso. */
+function config_local_salvar(array $dados) {
+    return dados_gravar(config_local_arquivo(),
+        "<?php\n// Gerado pela aba Configurações do painel — não editar à mão.\nreturn "
+        . var_export($dados, true) . ";\n");
 }
 
 $CONFIG_LOCAL = config_local_carregar();
@@ -76,21 +91,9 @@ function clientes_carregar() {
 
 /** Grava a lista de clientes (mesmo formato seguro do config.local.php). */
 function clientes_salvar(array $clientes) {
-    $dir = dirname(clientes_arquivo());
-    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-        return false;
-    }
-    @file_put_contents($dir . '/.htaccess', "Require all denied\n");
-    $php = "<?php\n// Gerado pela aba Clientes do painel — não editar à mão.\nreturn "
-        . var_export(array_values($clientes), true) . ";\n";
-    if (@file_put_contents(clientes_arquivo(), $php, LOCK_EX) === false) {
-        return false;
-    }
-    @chmod(clientes_arquivo(), 0600); // contém hashes de senha
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate(clientes_arquivo(), true); // remoção/troca de senha vale na hora
-    }
-    return true;
+    return dados_gravar(clientes_arquivo(),
+        "<?php\n// Gerado pela aba Clientes do painel — não editar à mão.\nreturn "
+        . var_export(array_values($clientes), true) . ";\n");
 }
 
 /** Busca um cliente pelo e-mail (sem diferenciar maiúsculas). Retorna array|null. */

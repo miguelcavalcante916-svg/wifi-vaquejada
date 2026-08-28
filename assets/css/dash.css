@@ -16,7 +16,10 @@
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line);
 }
-.dash-top__right { display: flex; align-items: center; gap: 10px; }
+.dash-top__right {
+    display: flex; align-items: center; justify-content: flex-end;
+    flex-wrap: wrap; gap: 8px 10px; /* saudação + Sair quebram de linha no celular */
+}
 
 .dash-badge {
     display: inline-flex; align-items: center; gap: 7px;

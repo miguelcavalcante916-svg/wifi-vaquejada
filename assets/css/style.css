@@ -177,10 +177,11 @@ p { margin: 0; }
 }
 .nav a:hover { color: var(--blue-light); background: rgba(255,255,255,.05); }
 
-/* "Já sou cliente" dentro da nav só existe para o menu mobile — no desktop o
-   botão fantasma do header já cumpre esse papel. */
+/* "Já sou cliente": em telas largas é o botão fantasma do header; em telas
+   médias (o header ficaria apertado) e no menu mobile, vira item da nav. */
 .nav .nav__portal { color: var(--blue-light); }
-@media (min-width: 721px) { .nav .nav__portal { display: none; } }
+@media (min-width: 993px) { .nav .nav__portal { display: none; } }
+@media (max-width: 992px) { .header__actions .btn--ghost { display: none; } }
 
 .header__actions { display: flex; align-items: center; gap: 10px; }
 
@@ -604,8 +605,10 @@ p { margin: 0; }
     .footer__brand { grid-column: 1 / -1; }
 }
 
-@media (max-width: 720px) {
-    .nav, .header__actions .btn--ghost { display: none; }
+/* Com 6 itens de nav + 2 botões o header só cabe folgado acima de ~992px;
+   abaixo disso o menu vira hambúrguer (o "Testar grátis" continua visível). */
+@media (max-width: 992px) {
+    .nav { display: none; }
     .nav-toggle { display: flex; }
     .nav.is-open {
         display: flex;

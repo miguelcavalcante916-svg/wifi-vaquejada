@@ -13,6 +13,7 @@
  * este painel deve ler os dados reais do backend da agência.
  */
 if (session_status() === PHP_SESSION_NONE) {
+    session_name('cavpainel'); // não colide com o PHPSESSID de outro site no mesmo domínio
     session_set_cookie_params([
         'httponly' => true,
         'samesite' => 'Lax',
@@ -26,11 +27,15 @@ $cfgLocal = config_local_carregar();
 $temSenha = !empty($cfgLocal['senha_hash']);
 $logado   = !empty($_SESSION['cfg_ok']);
 
-// Cliente do portal logado? Revalida contra o cadastro a cada acesso — se a
-// agência remover o cliente, a sessão dele deixa de valer na hora.
+// Cliente do portal logado? Revalida contra o cadastro a cada acesso: se a
+// agência remover o cliente OU trocar a senha dele, a sessão cai na hora
+// (a "marca" gravada no login é o sha1 do hash vigente).
 $cliente = !empty($_SESSION['cli_email']) ? cliente_por_email($_SESSION['cli_email']) : null;
+if ($cliente && !hash_equals((string) ($_SESSION['cli_marca'] ?? ''), sha1((string) ($cliente['hash'] ?? '')))) {
+    $cliente = null;
+}
 if (!empty($_SESSION['cli_email']) && !$cliente) {
-    unset($_SESSION['cli_email']);
+    unset($_SESSION['cli_email'], $_SESSION['cli_marca']);
 }
 $cliLogado = $cliente !== null;
 
@@ -41,7 +46,7 @@ $csrf = $_SESSION['cfg_csrf'];
 
 /** Guarda a mensagem e volta para a aba administrativa (POST → redirect → GET). */
 function cfg_flash($msg, $erro = false, $aba = 'config') {
-    $_SESSION['cfg_msg'] = [$msg, (bool) $erro];
+    $_SESSION['cfg_msg'] = [$msg, (bool) $erro, $aba];
     // Sem sessão da agência, a página exige ?agencia=1 para exibir a tela de
     // acesso (senão redireciona ao portal e a mensagem se perde).
     $destino = !empty($_SESSION['cfg_ok']) ? 'dashboard.php' : 'dashboard.php?agencia=1';
@@ -51,6 +56,16 @@ function cfg_flash($msg, $erro = false, $aba = 'config') {
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $acao = (string) ($_POST['acao'] ?? '');
+
+    // Sair do cliente não exige CSRF: com a sessão expirada o token antigo
+    // nunca bateria, e o pior que um "logout forjado" faz é... deslogar.
+    if ($acao === 'sair_cliente') {
+        unset($_SESSION['cli_email'], $_SESSION['cli_marca']);
+        session_regenerate_id(true);
+        header('Location: portal.php');
+        exit;
+    }
+
     if (!hash_equals($csrf, (string) ($_POST['csrf'] ?? ''))) {
         cfg_flash('Sessão expirada — recarregue a página e tente de novo.', true);
     }
@@ -58,13 +73,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if ($acao === 'sair') {
         unset($_SESSION['cfg_ok']);
         cfg_flash('Você saiu das configurações.');
-    }
-
-    if ($acao === 'sair_cliente') {
-        unset($_SESSION['cli_email']);
-        session_regenerate_id(true);
-        header('Location: portal.php');
-        exit;
     }
 
     if ($acao === 'criar_senha' && !$temSenha) {
@@ -268,13 +276,15 @@ unset($_SESSION['cfg_msg']);
 
 // ---------------------------------------------------------------------------
 // Controle de acesso: sem login nenhum, o painel não aparece.
+// ?agencia=1 sempre mostra a tela de senha da agência (mesmo com um cliente
+// logado no mesmo navegador — senão a agência ficaria sem caminho de entrada).
 // ---------------------------------------------------------------------------
-$modoAcessoAgencia = !$cliLogado && !$logado && isset($_GET['agencia']);
+$modoAcessoAgencia = !$logado && isset($_GET['agencia']);
 if (!$cliLogado && !$logado && !$modoAcessoAgencia) {
     header('Location: portal.php');
     exit;
 }
-$verPainel  = $cliLogado || $logado;         // abas do dia a dia
+$verPainel  = ($cliLogado || $logado) && !$modoAcessoAgencia; // abas do dia a dia
 $verAdmin   = $logado;                       // 👥 Clientes + ⚙️ Configurações
 $abaInicial = $verPainel ? 'visao' : 'config';
 
@@ -584,7 +594,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
     <section class="dash-tab" id="clientes" aria-labelledby="h-clientes">
         <h1 id="h-clientes" class="dash-h1">👥 Clientes</h1>
 
-        <?php if ($cfgMsg): ?>
+        <?php if ($cfgMsg && ($cfgMsg[2] ?? 'config') === 'clientes'): ?>
         <p class="cfg-msg<?= $cfgMsg[1] ? ' cfg-msg--erro' : '' ?>" role="status"><?= htmlspecialchars($cfgMsg[0]) ?></p>
         <?php endif; ?>
 
@@ -648,7 +658,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
     <section class="dash-tab<?= $abaInicial === 'config' ? ' is-active' : '' ?>" id="config" aria-labelledby="h-config">
         <h1 id="h-config" class="dash-h1"><?= $modoAcessoAgencia ? '🔐 Acesso da agência' : '⚙️ Configurações' ?></h1>
 
-        <?php if ($cfgMsg): ?>
+        <?php if ($cfgMsg && ($cfgMsg[2] ?? 'config') === 'config'): ?>
         <p class="cfg-msg<?= $cfgMsg[1] ? ' cfg-msg--erro' : '' ?>" role="status"><?= htmlspecialchars($cfgMsg[0]) ?></p>
         <?php endif; ?>
 

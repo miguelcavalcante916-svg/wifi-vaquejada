@@ -16,6 +16,7 @@ require __DIR__ . '/config.php'; // inclui o shim de mbstring
 
 // Mesma sessão do portal/painel — o chat só atende quem está logado.
 if (session_status() === PHP_SESSION_NONE) {
+    session_name('cavpainel'); // não colide com o PHPSESSID de outro site no mesmo domínio
     session_set_cookie_params([
         'httponly' => true,
         'samesite' => 'Lax',
@@ -23,8 +24,9 @@ if (session_status() === PHP_SESSION_NONE) {
     ]);
     session_start();
 }
+$cliChat  = !empty($_SESSION['cli_email']) ? cliente_por_email($_SESSION['cli_email']) : null;
 $sessaoOk = !empty($_SESSION['cfg_ok'])
-    || (!empty($_SESSION['cli_email']) && cliente_por_email($_SESSION['cli_email']) !== null);
+    || ($cliChat && hash_equals((string) ($_SESSION['cli_marca'] ?? ''), sha1((string) ($cliChat['hash'] ?? ''))));
 session_write_close(); // não escrevemos na sessão; libera o lock para outras abas
 
 header('Content-Type: application/json; charset=utf-8');
