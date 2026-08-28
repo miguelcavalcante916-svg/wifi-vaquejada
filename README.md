@@ -21,8 +21,11 @@ pagamento.
 .
 ├── index.php          # Landing page completa (hero com demo animada, recursos,
 │                      #   como funciona, PLANOS, exemplos de uso, FAQ, CTA, rodapé)
-├── dashboard.php      # PAINEL do cliente: visão geral (métricas + gráfico),
-│                      #   conversas, pipeline de vendas e chat com o Agente IA
+├── portal.php         # PORTAL do cliente: login com e-mail e senha (botão
+│                      #   "Já sou cliente" no site)
+├── dashboard.php      # PAINEL: visão geral (métricas + gráfico), conversas,
+│                      #   pipeline, chat com o Agente IA e (só agência)
+│                      #   👥 Clientes + ⚙️ Configurações
 ├── ia.php             # Endpoint do chat de IA (Anthropic API ou modo demo)
 ├── config.php         # Configuração central: agência, PONTE_URL e os 3 planos
 ├── trial.php          # Endpoint: inicia teste grátis (proxy p/ a ponte)
@@ -36,9 +39,24 @@ pagamento.
     └── js/dash.js     # Abas do painel + chat do Agente IA
 ```
 
-## Painel do cliente (`dashboard.php`)
+## Portal do cliente (`portal.php`) e quem vê o quê
 
-Acessível em `/dashboard.php` (link no rodapé do site). Abas:
+O painel **não abre mais sem login**:
+
+| Quem | Como entra | O que vê |
+|---|---|---|
+| **Cliente** | Botão **"Já sou cliente"** no site → `portal.php`, com o e-mail e a senha cadastrados pela agência | Visão geral, Conversas, Pipeline e Agente IA (sem abas administrativas) |
+| **Agência** | Link "Acesso da agência" no portal (`dashboard.php?agencia=1`) → senha de administração | Tudo, incluindo 👥 Clientes e ⚙️ Configurações |
+| Ninguém logado | — | É redirecionado para o portal |
+
+Na aba **👥 Clientes** a agência cadastra cada cliente (nome, e-mail e senha),
+troca senhas e remove acessos — a remoção derruba a sessão do cliente na hora.
+Os cadastros ficam em `dados/clientes.local.php` (fora do Git, senha como
+hash, sem acesso por URL).
+
+## Painel (`dashboard.php`)
+
+Abas:
 
 - **Visão geral** — atendimentos do dia, leads qualificados, reuniões,
   tempo de resposta, gráfico dos últimos 7 dias e consumo de créditos de IA.
@@ -47,7 +65,8 @@ Acessível em `/dashboard.php` (link no rodapé do site). Abas:
 - **Pipeline** — funil kanban: novo lead → qualificação → qualificado →
   reunião marcada → fechado.
 - **Agente IA** — chat funcional com o agente (veja abaixo).
-- **⚙️ Configurações** — configure TUDO pelo navegador (veja abaixo).
+- **👥 Clientes** *(só agência)* — cadastro dos acessos ao portal do cliente.
+- **⚙️ Configurações** *(só agência)* — configure TUDO pelo navegador (veja abaixo).
 
 ## ⚙️ Configurações pelo navegador
 
@@ -62,9 +81,10 @@ Chrome, sem tocar em código:
 
 Como funciona:
 
-1. **Primeira visita** à aba: você cria uma senha. ⚠ **Faça isso assim que
-   publicar o site**, antes de divulgar o endereço.
-2. Depois, a aba pede a senha para entrar.
+1. **Primeiro acesso**: abra `dashboard.php?agencia=1` (ou o link "Acesso da
+   agência" no portal) e crie a senha de administração. ⚠ **Faça isso assim
+   que publicar o site**, antes de divulgar o endereço.
+2. Depois, a mesma tela pede a senha para entrar.
 3. Tudo que você salvar vale imediatamente no site e no agente.
 
 Onde os dados ficam: em `dados/config.local.php` — arquivo **fora do Git**
@@ -81,7 +101,9 @@ servidor, têm prioridade sobre o painel.
 
 ## IA integrada (`ia.php`)
 
-O chat da aba **Agente IA** chama `ia.php`, que responde em um de dois modos:
+O chat da aba **Agente IA** chama `ia.php`, que **só responde a quem está
+logado** (cliente do portal ou agência — o chat pode consumir créditos reais
+da API) e funciona em um de dois modos:
 
 | Modo | Quando | Como ativar |
 |---|---|---|
@@ -157,8 +179,9 @@ Requer **PHP 7.4+** com a extensão **cURL**.
 
 ## ✅ Antes de publicar (checklist)
 
-- [ ] **WhatsApp real** em `config.php` — hoje está um número de exemplo
-      (`5511999999999`).
+- [ ] **Senha de administração criada** (`dashboard.php?agencia=1`) logo após
+      publicar, e **clientes cadastrados** na aba 👥 Clientes.
+- [ ] **WhatsApp** conferido em `config.php` (ou na aba ⚙️ Configurações).
 - [ ] **Backend de produção** em `PONTE_URL` — o padrão atual é um túnel
       `ngrok` de desenvolvimento e **vai expirar**. Aponte para o domínio
       definitivo ou defina a variável de ambiente.

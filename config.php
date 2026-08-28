@@ -48,10 +48,64 @@ function config_local_salvar(array $dados) {
         return false;
     }
     @chmod(config_local_arquivo(), 0600); // contém hash de senha e chave da IA
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(config_local_arquivo(), true); // o include seguinte já vê o novo conteúdo
+    }
     return true;
 }
 
 $CONFIG_LOCAL = config_local_carregar();
+
+// ----------------------------------------------------------------------------
+// Clientes do portal (cadastrados pela aba 👥 Clientes do painel)
+// ----------------------------------------------------------------------------
+function clientes_arquivo() {
+    return __DIR__ . '/dados/clientes.local.php';
+}
+
+function clientes_carregar() {
+    $arq = clientes_arquivo();
+    if (is_file($arq)) {
+        $d = include $arq;
+        if (is_array($d)) {
+            return array_values(array_filter($d, 'is_array'));
+        }
+    }
+    return [];
+}
+
+/** Grava a lista de clientes (mesmo formato seguro do config.local.php). */
+function clientes_salvar(array $clientes) {
+    $dir = dirname(clientes_arquivo());
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        return false;
+    }
+    @file_put_contents($dir . '/.htaccess', "Require all denied\n");
+    $php = "<?php\n// Gerado pela aba Clientes do painel — não editar à mão.\nreturn "
+        . var_export(array_values($clientes), true) . ";\n";
+    if (@file_put_contents(clientes_arquivo(), $php, LOCK_EX) === false) {
+        return false;
+    }
+    @chmod(clientes_arquivo(), 0600); // contém hashes de senha
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate(clientes_arquivo(), true); // remoção/troca de senha vale na hora
+    }
+    return true;
+}
+
+/** Busca um cliente pelo e-mail (sem diferenciar maiúsculas). Retorna array|null. */
+function cliente_por_email($email) {
+    $email = mb_strtolower(trim((string) $email));
+    if ($email === '') {
+        return null;
+    }
+    foreach (clientes_carregar() as $c) {
+        if (mb_strtolower(trim((string) ($c['email'] ?? ''))) === $email) {
+            return $c;
+        }
+    }
+    return null;
+}
 
 /** Chave da API de IA: variável de ambiente tem prioridade sobre o painel. */
 function ia_chave() {

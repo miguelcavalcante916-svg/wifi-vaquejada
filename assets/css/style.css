@@ -177,6 +177,11 @@ p { margin: 0; }
 }
 .nav a:hover { color: var(--blue-light); background: rgba(255,255,255,.05); }
 
+/* "Já sou cliente" dentro da nav só existe para o menu mobile — no desktop o
+   botão fantasma do header já cumpre esse papel. */
+.nav .nav__portal { color: var(--blue-light); }
+@media (min-width: 721px) { .nav .nav__portal { display: none; } }
+
 .header__actions { display: flex; align-items: center; gap: 10px; }
 
 .nav-toggle {

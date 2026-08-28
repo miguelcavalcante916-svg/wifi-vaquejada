@@ -14,6 +14,19 @@
 
 require __DIR__ . '/config.php'; // inclui o shim de mbstring
 
+// Mesma sessão do portal/painel — o chat só atende quem está logado.
+if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure'   => !empty($_SERVER['HTTPS']),
+    ]);
+    session_start();
+}
+$sessaoOk = !empty($_SESSION['cfg_ok'])
+    || (!empty($_SESSION['cli_email']) && cliente_por_email($_SESSION['cli_email']) !== null);
+session_write_close(); // não escrevemos na sessão; libera o lock para outras abas
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
@@ -40,6 +53,14 @@ if (($sf !== '' && !in_array($sf, ['same-origin', 'same-site', 'none'], true))
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') === false) {
     http_response_code(415);
     echo json_encode(['ok' => false, 'erro' => 'Envie JSON (Content-Type: application/json).'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// O chat consome créditos reais da API — só responde a quem entrou pelo
+// portal (cliente cadastrado) ou pela área da agência.
+if (!$sessaoOk) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'erro' => 'Sua sessão expirou — entre novamente no portal para conversar com o agente.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

@@ -59,10 +59,11 @@ $anoAtual    = $AGENCIA['ano'];
             <a href="#planos">Planos</a>
             <a href="#depoimentos">Exemplos</a>
             <a href="#perguntas">Perguntas</a>
+            <a href="portal.php" class="nav__portal">Já sou cliente</a>
         </nav>
 
         <div class="header__actions">
-            <a class="btn btn--ghost btn--sm" href="<?= htmlspecialchars($whatsPadrao) ?>" target="_blank" rel="noopener">Falar no WhatsApp</a>
+            <a class="btn btn--ghost btn--sm" href="portal.php">Já sou cliente</a>
             <a class="btn btn--primary btn--sm" href="#planos" data-scroll>Testar grátis</a>
         </div>
 
@@ -387,7 +388,7 @@ $anoAtual    = $AGENCIA['ano'];
             <a href="#como-funciona">Como funciona</a>
             <a href="#planos">Planos</a>
             <a href="#perguntas">Perguntas</a>
-            <a href="dashboard.php">Painel do cliente</a>
+            <a href="portal.php">Portal do cliente</a>
         </nav>
 
         <div class="footer__col">

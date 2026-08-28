@@ -1,9 +1,14 @@
 <?php
 /**
- * dashboard.php — Painel do cliente (Agente de IA no WhatsApp).
+ * dashboard.php — Painel (Agente de IA no WhatsApp).
  *
- * Abas: Visão geral, Conversas, Pipeline, Agente IA (chat integrado) e
- * Configurações (protegida por senha — salva em dados/config.local.php).
+ * Quem entra vê o quê:
+ *  - CLIENTE (login em portal.php, cadastrado na aba Clientes):
+ *      Visão geral, Conversas, Pipeline e Agente IA.
+ *  - AGÊNCIA (senha de administração): tudo acima + 👥 Clientes +
+ *      ⚙️ Configurações (dados em dados/config.local.php).
+ *  - Ninguém logado: volta para portal.php (com ?agencia=1 mostra só a
+ *      tela de acesso da agência).
  * Os números e conversas exibidos são DADOS DE DEMONSTRAÇÃO — em produção,
  * este painel deve ler os dados reais do backend da agência.
  */
@@ -20,15 +25,27 @@ require __DIR__ . '/config.php';
 $cfgLocal = config_local_carregar();
 $temSenha = !empty($cfgLocal['senha_hash']);
 $logado   = !empty($_SESSION['cfg_ok']);
+
+// Cliente do portal logado? Revalida contra o cadastro a cada acesso — se a
+// agência remover o cliente, a sessão dele deixa de valer na hora.
+$cliente = !empty($_SESSION['cli_email']) ? cliente_por_email($_SESSION['cli_email']) : null;
+if (!empty($_SESSION['cli_email']) && !$cliente) {
+    unset($_SESSION['cli_email']);
+}
+$cliLogado = $cliente !== null;
+
 if (empty($_SESSION['cfg_csrf'])) {
     $_SESSION['cfg_csrf'] = bin2hex(random_bytes(16));
 }
 $csrf = $_SESSION['cfg_csrf'];
 
-/** Guarda a mensagem e volta para a aba Configurações (POST → redirect → GET). */
-function cfg_flash($msg, $erro = false) {
+/** Guarda a mensagem e volta para a aba administrativa (POST → redirect → GET). */
+function cfg_flash($msg, $erro = false, $aba = 'config') {
     $_SESSION['cfg_msg'] = [$msg, (bool) $erro];
-    header('Location: dashboard.php#config');
+    // Sem sessão da agência, a página exige ?agencia=1 para exibir a tela de
+    // acesso (senão redireciona ao portal e a mensagem se perde).
+    $destino = !empty($_SESSION['cfg_ok']) ? 'dashboard.php' : 'dashboard.php?agencia=1';
+    header('Location: ' . $destino . '#' . $aba);
     exit;
 }
 
@@ -41,6 +58,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if ($acao === 'sair') {
         unset($_SESSION['cfg_ok']);
         cfg_flash('Você saiu das configurações.');
+    }
+
+    if ($acao === 'sair_cliente') {
+        unset($_SESSION['cli_email']);
+        session_regenerate_id(true);
+        header('Location: portal.php');
+        exit;
     }
 
     if ($acao === 'criar_senha' && !$temSenha) {
@@ -154,8 +178,84 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         cfg_flash('Configurações salvas! O site e o agente já estão usando os novos dados.');
     }
 
+    // ---- Aba 👥 Clientes (só com a sessão da agência) ----
+    if ($acao === 'cliente_criar' && $logado) {
+        $nome  = trim((string) ($_POST['cli_nome'] ?? ''));
+        $email = mb_strtolower(trim((string) ($_POST['cli_email'] ?? '')));
+        $senha = (string) ($_POST['cli_senha'] ?? '');
+        $erros = [];
+        if ($nome === '' || mb_strlen($nome) > 60) {
+            $erros[] = 'Informe o nome do cliente (até 60 caracteres).';
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $erros[] = 'E-mail inválido.';
+        }
+        if (strlen($senha) < 8) {
+            $erros[] = 'A senha precisa ter pelo menos 8 caracteres.';
+        }
+        if (!$erros && cliente_por_email($email)) {
+            $erros[] = 'Já existe um cliente com esse e-mail.';
+        }
+        if ($erros) {
+            cfg_flash('Cliente não cadastrado. ' . implode(' ', $erros), true, 'clientes');
+        }
+        $lista   = clientes_carregar();
+        $lista[] = [
+            'nome'   => mb_substr($nome, 0, 60),
+            'email'  => $email,
+            'hash'   => password_hash($senha, PASSWORD_DEFAULT),
+            'criado' => date('d/m/Y'),
+        ];
+        if (!clientes_salvar($lista)) {
+            cfg_flash('Não consegui gravar na pasta dados/ — verifique as permissões no servidor.', true, 'clientes');
+        }
+        cfg_flash('Cliente cadastrado! Ele já pode entrar no portal com esse e-mail e senha.', false, 'clientes');
+    }
+
+    if ($acao === 'cliente_senha' && $logado) {
+        $email = mb_strtolower(trim((string) ($_POST['cli_email'] ?? '')));
+        $senha = (string) ($_POST['cli_senha'] ?? '');
+        if (strlen($senha) < 8) {
+            cfg_flash('A nova senha precisa ter pelo menos 8 caracteres.', true, 'clientes');
+        }
+        $lista = clientes_carregar();
+        $achou = false;
+        foreach ($lista as $i => $c) {
+            if (mb_strtolower(trim((string) ($c['email'] ?? ''))) === $email) {
+                $lista[$i]['hash'] = password_hash($senha, PASSWORD_DEFAULT);
+                $achou = true;
+                break;
+            }
+        }
+        if (!$achou) {
+            cfg_flash('Cliente não encontrado.', true, 'clientes');
+        }
+        if (!clientes_salvar($lista)) {
+            cfg_flash('Não consegui gravar na pasta dados/ — verifique as permissões no servidor.', true, 'clientes');
+        }
+        cfg_flash('Senha do cliente atualizada — avise-o da nova senha.', false, 'clientes');
+    }
+
+    if ($acao === 'cliente_remover' && $logado) {
+        $email = mb_strtolower(trim((string) ($_POST['cli_email'] ?? '')));
+        $lista = clientes_carregar();
+        $nova  = array_values(array_filter($lista, function ($c) use ($email) {
+            return mb_strtolower(trim((string) ($c['email'] ?? ''))) !== $email;
+        }));
+        if (count($nova) === count($lista)) {
+            cfg_flash('Cliente não encontrado.', true, 'clientes');
+        }
+        if (!clientes_salvar($nova)) {
+            cfg_flash('Não consegui gravar na pasta dados/ — verifique as permissões no servidor.', true, 'clientes');
+        }
+        cfg_flash('Cliente removido — o acesso dele ao portal foi cancelado.', false, 'clientes');
+    }
+
     if ($acao === 'salvar' && !$logado) {
         cfg_flash('Você saiu das configurações em outra aba — entre novamente e salve de novo.', true);
+    }
+    if (in_array($acao, ['cliente_criar', 'cliente_senha', 'cliente_remover'], true) && !$logado) {
+        cfg_flash('Sua sessão da agência expirou — entre novamente.', true);
     }
     if ($acao === 'criar_senha' && $temSenha) {
         cfg_flash('A senha já foi criada — entre com ela abaixo.', true);
@@ -165,6 +265,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 $cfgMsg = $_SESSION['cfg_msg'] ?? null;
 unset($_SESSION['cfg_msg']);
+
+// ---------------------------------------------------------------------------
+// Controle de acesso: sem login nenhum, o painel não aparece.
+// ---------------------------------------------------------------------------
+$modoAcessoAgencia = !$cliLogado && !$logado && isset($_GET['agencia']);
+if (!$cliLogado && !$logado && !$modoAcessoAgencia) {
+    header('Location: portal.php');
+    exit;
+}
+$verPainel  = $cliLogado || $logado;         // abas do dia a dia
+$verAdmin   = $logado;                       // 👥 Clientes + ⚙️ Configurações
+$abaInicial = $verPainel ? 'visao' : 'config';
+
+$CLIENTES_PORTAL = $verAdmin ? clientes_carregar() : [];
 
 $iaConfigurada = ia_chave() !== '';
 $iaViaEnv      = (bool) (getenv('IA_API_KEY') ?: getenv('ANTHROPIC_API_KEY'));
@@ -255,23 +369,41 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
         </span>
     </a>
     <div class="dash-top__right">
+        <?php if ($verPainel): ?>
         <span class="dash-badge dash-badge--demo" title="Este painel exibe dados fictícios de demonstração">Demonstração</span>
         <span class="dash-badge dash-badge--on"><span class="dash-dot" aria-hidden="true"></span> Agente ativo</span>
+        <?php endif; ?>
+        <?php if ($cliLogado): ?>
+        <span class="dash-user">Olá, <strong><?= htmlspecialchars(explode(' ', trim((string) ($cliente['nome'] ?? '')))[0] ?: $cliente['email']) ?></strong></span>
+        <form method="post" class="dash-sair">
+            <input type="hidden" name="acao" value="sair_cliente">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <button type="submit" class="btn btn--outline btn--sm">Sair</button>
+        </form>
+        <?php endif; ?>
     </div>
 </header>
 
 <div class="dash-wrap">
     <!-- Navegação lateral / abas -->
     <nav class="dash-nav" aria-label="Seções do painel">
-        <a href="#visao" class="dash-nav__item is-active" data-tab="visao" aria-current="true">📊 <span>Visão geral</span></a>
+        <?php if ($verPainel): ?>
+        <a href="#visao" class="dash-nav__item<?= $abaInicial === 'visao' ? ' is-active' : '' ?>" data-tab="visao"<?= $abaInicial === 'visao' ? ' aria-current="true"' : '' ?>>📊 <span>Visão geral</span></a>
         <a href="#conversas" class="dash-nav__item" data-tab="conversas">💬 <span>Conversas</span></a>
         <a href="#pipeline" class="dash-nav__item" data-tab="pipeline">🧭 <span>Pipeline</span></a>
         <a href="#agente" class="dash-nav__item" data-tab="agente">🤖 <span>Agente IA</span></a>
-        <a href="#config" class="dash-nav__item" data-tab="config">⚙️ <span>Configurações</span></a>
+        <?php endif; ?>
+        <?php if ($verAdmin): ?>
+        <a href="#clientes" class="dash-nav__item" data-tab="clientes">👥 <span>Clientes</span></a>
+        <?php endif; ?>
+        <?php if ($verAdmin || $modoAcessoAgencia): ?>
+        <a href="#config" class="dash-nav__item<?= $abaInicial === 'config' ? ' is-active' : '' ?>" data-tab="config"<?= $abaInicial === 'config' ? ' aria-current="true"' : '' ?>>⚙️ <span>Configurações</span></a>
+        <?php endif; ?>
     </nav>
 
     <main id="conteudo" class="dash-main">
 
+    <?php if ($verPainel): ?>
     <!-- ============ VISÃO GERAL ============ -->
     <section class="dash-tab is-active" id="visao" aria-labelledby="h-visao">
         <h1 id="h-visao" class="dash-h1">Visão geral</h1>
@@ -427,8 +559,10 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
             <div class="dash-card">
                 <h2 class="dash-h2">Como funciona</h2>
                 <p class="dash-note">Este é o mesmo cérebro que atende no seu WhatsApp. Teste perguntas reais dos seus clientes: preços, horários, agendamento…</p>
-                <?php if (!$iaConfigurada): ?>
+                <?php if (!$iaConfigurada && $verAdmin): ?>
                 <p class="dash-note dash-note--warn">⚠ Rodando em <strong>modo demonstração</strong> (respostas pré-programadas). Para ativar a IA real, cole sua chave da Anthropic na aba <a href="#config">⚙️ Configurações</a>.</p>
+                <?php elseif (!$iaConfigurada): ?>
+                <p class="dash-note dash-note--warn">⚠ Rodando em <strong>modo demonstração</strong> (respostas pré-programadas). A ativação da IA real é feita pela agência.</p>
                 <?php else: ?>
                 <p class="dash-note">✅ IA real conectada via API da Anthropic<?= $iaViaPainel ? ' (chave salva nas Configurações)' : '' ?>.</p>
                 <?php endif; ?>
@@ -443,9 +577,76 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
         </div>
     </section>
 
+    <?php endif; /* $verPainel */ ?>
+
+    <?php if ($verAdmin): ?>
+    <!-- ============ CLIENTES (portal) ============ -->
+    <section class="dash-tab" id="clientes" aria-labelledby="h-clientes">
+        <h1 id="h-clientes" class="dash-h1">👥 Clientes</h1>
+
+        <?php if ($cfgMsg): ?>
+        <p class="cfg-msg<?= $cfgMsg[1] ? ' cfg-msg--erro' : '' ?>" role="status"><?= htmlspecialchars($cfgMsg[0]) ?></p>
+        <?php endif; ?>
+
+        <div class="dash-card">
+            <h2 class="dash-h2">Cadastrar novo cliente</h2>
+            <p class="dash-note">Cada cliente cadastrado aqui entra no <strong>portal do cliente</strong> (link "Já sou cliente" no site) com o e-mail e a senha que você definir — e vê o painel sem as abas administrativas.</p>
+            <form method="post" class="cfg-form">
+                <input type="hidden" name="acao" value="cliente_criar">
+                <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+                <label>Nome do cliente
+                    <input type="text" name="cli_nome" maxlength="60" required placeholder="ex.: Studio Belle" autocomplete="off">
+                </label>
+                <label>E-mail de acesso
+                    <input type="email" name="cli_email" required placeholder="cliente@gmail.com" autocomplete="off">
+                </label>
+                <label>Senha (mínimo 8 caracteres)
+                    <input type="password" name="cli_senha" minlength="8" required autocomplete="new-password">
+                </label>
+                <button type="submit" class="btn btn--primary">Cadastrar cliente</button>
+            </form>
+        </div>
+
+        <div class="dash-card">
+            <h2 class="dash-h2">Clientes cadastrados<?= $CLIENTES_PORTAL ? ' (' . count($CLIENTES_PORTAL) . ')' : '' ?></h2>
+            <?php if (!$CLIENTES_PORTAL): ?>
+            <p class="dash-note">Nenhum cliente ainda. Cadastre o primeiro acima — depois é só passar o e-mail e a senha para ele entrar no portal.</p>
+            <?php else: ?>
+            <ul class="cli-lista">
+                <?php foreach ($CLIENTES_PORTAL as $c): ?>
+                <li class="cli-item">
+                    <span class="cli-item__dados">
+                        <strong><?= htmlspecialchars((string) ($c['nome'] ?? '')) ?></strong>
+                        <small><?= htmlspecialchars((string) ($c['email'] ?? '')) ?> · cadastrado em <?= htmlspecialchars((string) ($c['criado'] ?? '—')) ?></small>
+                    </span>
+                    <span class="cli-item__acoes">
+                        <form method="post" class="cli-form-senha">
+                            <input type="hidden" name="acao" value="cliente_senha">
+                            <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+                            <input type="hidden" name="cli_email" value="<?= htmlspecialchars((string) ($c['email'] ?? '')) ?>">
+                            <label class="sr-only" for="senha-<?= md5((string) ($c['email'] ?? '')) ?>">Nova senha para <?= htmlspecialchars((string) ($c['nome'] ?? '')) ?></label>
+                            <input id="senha-<?= md5((string) ($c['email'] ?? '')) ?>" type="password" name="cli_senha" minlength="8" required placeholder="Nova senha" autocomplete="new-password">
+                            <button type="submit" class="btn btn--outline btn--sm">Trocar senha</button>
+                        </form>
+                        <form method="post" data-confirmar="Remover o acesso de <?= htmlspecialchars((string) ($c['nome'] ?? '')) ?> ao portal?">
+                            <input type="hidden" name="acao" value="cliente_remover">
+                            <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+                            <input type="hidden" name="cli_email" value="<?= htmlspecialchars((string) ($c['email'] ?? '')) ?>">
+                            <button type="submit" class="btn btn--outline btn--sm cli-remover">Remover</button>
+                        </form>
+                    </span>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+        </div>
+    </section>
+    <?php endif; /* $verAdmin */ ?>
+
+    <?php if ($verAdmin || $modoAcessoAgencia): ?>
     <!-- ============ CONFIGURAÇÕES ============ -->
-    <section class="dash-tab" id="config" aria-labelledby="h-config">
-        <h1 id="h-config" class="dash-h1">⚙️ Configurações</h1>
+    <section class="dash-tab<?= $abaInicial === 'config' ? ' is-active' : '' ?>" id="config" aria-labelledby="h-config">
+        <h1 id="h-config" class="dash-h1"><?= $modoAcessoAgencia ? '🔐 Acesso da agência' : '⚙️ Configurações' ?></h1>
 
         <?php if ($cfgMsg): ?>
         <p class="cfg-msg<?= $cfgMsg[1] ? ' cfg-msg--erro' : '' ?>" role="status"><?= htmlspecialchars($cfgMsg[0]) ?></p>
@@ -573,7 +774,12 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
             <button type="submit" class="btn btn--outline btn--sm">Sair das configurações</button>
         </form>
         <?php endif; ?>
+
+        <?php if ($modoAcessoAgencia): ?>
+        <p class="dash-note" style="margin-top:14px"><a href="portal.php">← Voltar ao portal do cliente</a></p>
+        <?php endif; ?>
     </section>
+    <?php endif; /* $verAdmin || $modoAcessoAgencia */ ?>
 
     </main>
 </div>

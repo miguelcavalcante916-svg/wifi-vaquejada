@@ -234,6 +234,52 @@
     .cfg-planos { grid-template-columns: 1fr; }
 }
 
+/* Identificação do cliente logado na topbar */
+.dash-user { color: var(--muted); font-size: .88rem; white-space: nowrap; }
+.dash-user strong { color: var(--text); font-weight: 600; }
+.dash-sair { display: inline-flex; }
+
+/* Aba 👥 Clientes */
+.cli-lista { list-style: none; margin: 0; padding: 0; }
+.cli-item {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.cli-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.cli-item__dados { display: flex; flex-direction: column; gap: 2px; min-width: 200px; }
+.cli-item__dados small { color: var(--muted-2); font-size: .8rem; overflow-wrap: anywhere; }
+.cli-item__acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.cli-form-senha { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cli-form-senha input {
+    background: rgba(255,255,255,.04); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; color: var(--text); font: inherit;
+    font-size: .86rem; width: 150px;
+}
+.cli-form-senha input::placeholder { color: var(--muted-2); }
+.cli-form-senha input:focus-visible { outline: 2px solid var(--blue-light); outline-offset: 2px; }
+.cli-remover { border-color: rgba(239, 107, 107, .5); color: #f3a3a3; }
+.cli-remover:hover { background: rgba(239, 107, 107, .12); }
+
+/* Portal do cliente (portal.php) */
+.portal-body { display: block; }
+.portal {
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px; padding: 40px 20px;
+}
+.portal__brand { justify-content: center; }
+.portal__card { width: 100%; max-width: 420px; }
+.portal__titulo { font-size: 1.3rem; margin-bottom: 6px; }
+.portal__card .cfg-form { margin-top: 14px; }
+.portal__card .cfg-form .btn { align-self: stretch; justify-content: center; }
+.portal__links {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    color: var(--muted-2); font-size: .88rem; text-align: center;
+}
+.portal__links a { color: var(--blue-light); font-weight: 600; }
+
 /* Rodapé */
 .dash-foot {
     display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;

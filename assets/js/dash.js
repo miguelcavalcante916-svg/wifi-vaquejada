@@ -32,6 +32,13 @@
     abrir((location.hash || '').replace('#', ''));
   });
 
+  /* ---------- Confirmação antes de remover (aba Clientes) ---------- */
+  document.querySelectorAll('form[data-confirmar]').forEach(function (f) {
+    f.addEventListener('submit', function (e) {
+      if (!window.confirm(f.getAttribute('data-confirmar'))) e.preventDefault();
+    });
+  });
+
   /* ---------- Chat do Agente IA ---------- */
   var log = document.getElementById('iaLog');
   var form = document.getElementById('iaForm');
@@ -111,9 +118,11 @@
       })
       .catch(function (err) {
         tip.remove();
-        var extra = (err && err.message && err.message.indexOf('HTTP') !== 0 && err.message !== 'Failed to fetch')
-          ? ' (' + err.message + ')' : '';
-        bolha('agente', 'Ops, não consegui responder agora. Tente novamente em instantes.' + extra);
+        // Mensagens de erro do servidor já vêm prontas em PT-BR (ex.: sessão
+        // expirada); erros de rede/HTTP ganham o texto genérico.
+        var doServidor = (err && err.message && err.message.indexOf('HTTP') !== 0 && err.message !== 'Failed to fetch')
+          ? err.message : null;
+        bolha('agente', doServidor || 'Ops, não consegui responder agora. Tente novamente em instantes.');
       })
       .then(function () {
         clearTimeout(timeout);
