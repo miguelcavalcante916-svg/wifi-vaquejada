@@ -1,18 +1,51 @@
 <?php
+/**
+ * trial.php — inicia um teste grátis do Agente de IA.
+ *
+ * Repassa a solicitação para o backend (ponte) e devolve a resposta em JSON.
+ * Uso: GET /trial.php?plano=2
+ */
+require __DIR__ . '/config.php';
+
 header('Access-Control-Allow-Origin: *');
-header('Content-Type: application/json');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Content-Type: application/json; charset=utf-8');
 
-$ponte = 'https://lavinia-nonremissible-les.ngrok-free.dev';
-$plano = $_GET['plano'] ?? '2';
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
 
-$ch = curl_init();
-curl_setopt_array($ch, [
-    CURLOPT_URL => "$ponte/trial",
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT => 10
-]);
-$result = curl_exec($ch);
-curl_close($ch);
+$plano = preg_replace('/[^0-9]/', '', (string) ($_GET['plano'] ?? '2'));
+if ($plano === '') {
+    $plano = '2';
+}
 
-echo $result;
-?>
+list($body, $code, $erro) = chamar_ponte('trial?plano=' . urlencode($plano));
+
+if ($erro !== '' || $body === false) {
+    http_response_code(502);
+    echo json_encode([
+        'ok'    => false,
+        'erro'  => 'Não foi possível iniciar o teste agora.',
+        'detalhe' => $erro ?: 'Sem resposta do servidor.',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Se o backend já respondeu JSON válido, repassamos como veio.
+if (is_string($body) && $body !== '') {
+    json_decode($body);
+    if (json_last_error() === JSON_ERROR_NONE) {
+        http_response_code($code >= 200 && $code < 600 ? $code : 200);
+        echo $body;
+        exit;
+    }
+}
+
+// Caso contrário, embrulhamos a resposta bruta preservando o status upstream.
+http_response_code($code >= 200 && $code < 600 ? $code : 200);
+echo json_encode([
+    'ok'   => $code >= 200 && $code < 300,
+    'dados' => $body,
+], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);

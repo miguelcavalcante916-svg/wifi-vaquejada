@@ -1,0 +1,289 @@
+<?php
+/**
+ * Agência Cavalcante — Configuração central
+ *
+ * Os valores abaixo são os PADRÕES. Tudo que for salvo pela aba
+ * Configurações do painel (dashboard.php) fica em dados/config.local.php
+ * e sobrepõe os padrões. Nenhuma chave secreta fica neste arquivo.
+ */
+
+// Hospedagens compartilhadas nem sempre têm mbstring; degrada para substr
+// (pode partir um caractere multibyte no corte, aceitável para sanitização).
+if (!function_exists('mb_substr')) {
+    function mb_substr($s, $i, $l = null) { return $l === null ? substr($s, $i) : substr($s, $i, $l); }
+    function mb_strtolower($s) { return strtolower($s); }
+    function mb_strpos($h, $n) { return strpos($h, $n); }
+    function mb_strlen($s) { return strlen($s); }
+}
+
+// ----------------------------------------------------------------------------
+// Configuração local (salva pelo painel, no navegador)
+// ----------------------------------------------------------------------------
+function config_local_arquivo() {
+    return __DIR__ . '/dados/config.local.php';
+}
+
+function config_local_carregar() {
+    $arq = config_local_arquivo();
+    if (is_file($arq)) {
+        $d = include $arq;
+        if (is_array($d)) {
+            return $d;
+        }
+    }
+    return [];
+}
+
+/**
+ * Grava um arquivo PHP de dados na pasta dados/ de forma atômica (escreve em
+ * .tmp e renomeia): quem lê nunca enxerga um arquivo pela metade.
+ */
+function dados_gravar($arquivo, $php) {
+    $dir = dirname($arquivo);
+    // O teste extra de is_dir tolera duas requisições criando a pasta ao
+    // mesmo tempo (o mkdir de uma delas falha, mas a pasta existe).
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) {
+        return false;
+    }
+    // Defesa extra em Apache; o próprio .php já não expõe o conteúdo por HTTP.
+    @file_put_contents($dir . '/.htaccess', "Require all denied\n");
+    $tmp = $arquivo . '.' . getmypid() . '.tmp';
+    if (@file_put_contents($tmp, $php, LOCK_EX) === false) {
+        return false;
+    }
+    @chmod($tmp, 0600); // hashes de senha e chave da IA
+    if (!@rename($tmp, $arquivo)) {
+        @unlink($tmp);
+        return false;
+    }
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate($arquivo, true); // o include seguinte já vê o novo conteúdo
+    }
+    return true;
+}
+
+/** Grava a configuração local. Retorna true em caso de sucesso. */
+function config_local_salvar(array $dados) {
+    return dados_gravar(config_local_arquivo(),
+        "<?php\n// Gerado pela aba Configurações do painel — não editar à mão.\nreturn "
+        . var_export($dados, true) . ";\n");
+}
+
+$CONFIG_LOCAL = config_local_carregar();
+
+// ----------------------------------------------------------------------------
+// Clientes do portal (cadastrados pela aba 👥 Clientes do painel)
+// ----------------------------------------------------------------------------
+function clientes_arquivo() {
+    return __DIR__ . '/dados/clientes.local.php';
+}
+
+function clientes_carregar() {
+    $arq = clientes_arquivo();
+    if (is_file($arq)) {
+        $d = include $arq;
+        if (is_array($d)) {
+            return array_values(array_filter($d, 'is_array'));
+        }
+    }
+    return [];
+}
+
+/** Grava a lista de clientes (mesmo formato seguro do config.local.php). */
+function clientes_salvar(array $clientes) {
+    return dados_gravar(clientes_arquivo(),
+        "<?php\n// Gerado pela aba Clientes do painel — não editar à mão.\nreturn "
+        . var_export(array_values($clientes), true) . ";\n");
+}
+
+/** Busca um cliente pelo e-mail (sem diferenciar maiúsculas). Retorna array|null. */
+function cliente_por_email($email) {
+    $email = mb_strtolower(trim((string) $email));
+    if ($email === '') {
+        return null;
+    }
+    foreach (clientes_carregar() as $c) {
+        if (mb_strtolower(trim((string) ($c['email'] ?? ''))) === $email) {
+            return $c;
+        }
+    }
+    return null;
+}
+
+/** Chave da API de IA: variável de ambiente tem prioridade sobre o painel. */
+function ia_chave() {
+    $env = getenv('IA_API_KEY') ?: getenv('ANTHROPIC_API_KEY');
+    if ($env) {
+        return $env;
+    }
+    $local = config_local_carregar();
+    return (string) ($local['ia_api_key'] ?? '');
+}
+
+// ----------------------------------------------------------------------------
+// Backend / Ponte
+// ----------------------------------------------------------------------------
+// Endereço do serviço que gera trials e links de checkout (voucher).
+// Prioridade: variável de ambiente PONTE_URL > painel > padrão.
+if (!defined('PONTE_URL')) {
+    define('PONTE_URL', getenv('PONTE_URL')
+        ?: (!empty($CONFIG_LOCAL['ponte_url']) ? $CONFIG_LOCAL['ponte_url']
+            : 'https://lavinia-nonremissible-les.ngrok-free.dev'));
+}
+
+// Timeout (segundos) das chamadas ao backend.
+if (!defined('PONTE_TIMEOUT')) {
+    define('PONTE_TIMEOUT', 12);
+}
+
+// ----------------------------------------------------------------------------
+// Dados da agência
+// ----------------------------------------------------------------------------
+$AGENCIA = [
+    'nome'        => 'Agência Cavalcante',
+    'marca'       => 'Cavalcante',
+    'slogan'      => 'Agentes de IA no WhatsApp',
+    'descricao'   => 'Atendimento inteligente 24 horas: sua empresa responde, qualifica e vende no WhatsApp com um agente de IA que trabalha sem parar.',
+    'whatsapp'    => '5584999492725', // DDI+DDD+numero, apenas dígitos
+    'email'       => 'contato@agenciacavalcante.com.br',
+    'instagram'   => 'https://instagram.com/agenciacavalcante',
+    'cidade'      => '', // cidade/UF da agência, ex.: 'Natal - RN'
+    'ano'         => (int) date('Y'),
+];
+
+// O que foi salvo pelo painel sobrepõe os padrões acima.
+foreach (['whatsapp', 'email', 'instagram', 'cidade'] as $campo) {
+    if (!empty($CONFIG_LOCAL[$campo]) && is_string($CONFIG_LOCAL[$campo])) {
+        $AGENCIA[$campo] = $CONFIG_LOCAL[$campo];
+    }
+}
+
+// Mensagem padrão usada quando o visitante fala com a agência pelo WhatsApp.
+$WHATS_MSG_PADRAO = 'Olá! Vim pelo site da Agência Cavalcante e quero conhecer o Agente de IA para WhatsApp.';
+
+// ----------------------------------------------------------------------------
+// Planos
+// ----------------------------------------------------------------------------
+// O campo "plano" é o identificador enviado ao backend (voucher.php?plano=N).
+// "destaque" marca o plano recomendado. Preços em reais (BRL).
+$PLANOS = [
+    [
+        'plano'      => 1,
+        'nome'       => 'Essencial',
+        'resumo'     => 'Para começar a automatizar o atendimento.',
+        'preco'      => 197,
+        'periodo'    => '/mês',
+        'cobranca'   => 'cobrança trimestral — R$ 591 a cada 3 meses',
+        'creditos'   => '7.500 créditos de IA / trimestre',
+        'destaque'   => false,
+        'cta'        => 'Assinar Essencial',
+        'recursos'   => [
+            ['texto' => 'Agente de IA respondendo em texto', 'incluso' => true],
+            ['texto' => 'Atendimento automático 24h por dia', 'incluso' => true],
+            ['texto' => '1 número de WhatsApp conectado', 'incluso' => true],
+            ['texto' => 'Qualificação básica de leads', 'incluso' => true],
+            ['texto' => 'Painel de conversas', 'incluso' => true],
+            ['texto' => 'Respostas em áudio com voz humana', 'incluso' => false],
+            ['texto' => 'Leitura de imagens e follow-up', 'incluso' => false],
+            ['texto' => 'Integrações e agendamento', 'incluso' => false],
+        ],
+    ],
+    [
+        'plano'      => 2,
+        'nome'       => 'Profissional',
+        'resumo'     => 'O mais escolhido por quem quer vender mais.',
+        'preco'      => 397,
+        'periodo'    => '/mês',
+        'cobranca'   => 'cobrança trimestral — R$ 1.191 a cada 3 meses',
+        'creditos'   => '15.000 créditos de IA / trimestre',
+        'destaque'   => true,
+        'cta'        => 'Assinar Profissional',
+        'recursos'   => [
+            ['texto' => 'Tudo do plano Essencial', 'incluso' => true],
+            ['texto' => 'Respostas em áudio com voz humana', 'incluso' => true],
+            ['texto' => 'Leitura de imagens enviadas pelo cliente', 'incluso' => true],
+            ['texto' => 'Follow-up automático de leads', 'incluso' => true],
+            ['texto' => 'Agendamento de reuniões', 'incluso' => true],
+            ['texto' => 'Integrações com seus sistemas', 'incluso' => true],
+            ['texto' => 'Pipeline visual de vendas', 'incluso' => true],
+            ['texto' => 'Pesquisa na web em tempo real', 'incluso' => false],
+        ],
+    ],
+    [
+        'plano'      => 3,
+        'nome'       => 'Premium',
+        'resumo'     => 'Escala total para operações e equipes.',
+        'preco'      => 697,
+        'periodo'    => '/mês',
+        'cobranca'   => 'cobrança trimestral — R$ 2.091 a cada 3 meses',
+        'creditos'   => '30.000 créditos de IA / trimestre',
+        'destaque'   => false,
+        'cta'        => 'Assinar Premium',
+        'recursos'   => [
+            ['texto' => 'Tudo do plano Profissional', 'incluso' => true],
+            ['texto' => 'Pesquisa na web em tempo real', 'incluso' => true],
+            ['texto' => 'Múltiplos números de WhatsApp', 'incluso' => true],
+            ['texto' => 'Vários atendentes humanos no painel', 'incluso' => true],
+            ['texto' => 'Integrações avançadas e API', 'incluso' => true],
+            ['texto' => 'Follow-up e cadências ilimitadas', 'incluso' => true],
+            ['texto' => 'Suporte prioritário', 'incluso' => true],
+            ['texto' => 'Gerente de conta dedicado', 'incluso' => true],
+        ],
+    ],
+];
+
+// Preços/créditos salvos pelo painel sobrepõem os padrões; o total
+// trimestral exibido é recalculado a partir do preço vigente.
+foreach ($PLANOS as $i => $p) {
+    $ov = $CONFIG_LOCAL['planos'][(string) $p['plano']] ?? null;
+    if (is_array($ov)) {
+        if (isset($ov['preco']) && (int) $ov['preco'] > 0) {
+            $PLANOS[$i]['preco'] = (int) $ov['preco'];
+        }
+        if (!empty($ov['creditos']) && is_string($ov['creditos'])) {
+            $PLANOS[$i]['creditos'] = $ov['creditos'];
+        }
+        $PLANOS[$i]['cobranca'] = 'cobrança trimestral — R$ '
+            . number_format($PLANOS[$i]['preco'] * 3, 0, ',', '.') . ' a cada 3 meses';
+    }
+}
+
+/**
+ * Retorna um plano pelo identificador, ou null.
+ */
+function plano_por_id($id, array $planos) {
+    foreach ($planos as $p) {
+        if ((string) $p['plano'] === (string) $id) {
+            return $p;
+        }
+    }
+    return null;
+}
+
+/**
+ * Chama o backend (ponte) e devolve o corpo bruto da resposta.
+ * Retorna array [body, httpCode, erro].
+ */
+function chamar_ponte($caminho) {
+    $url = rtrim(PONTE_URL, '/') . '/' . ltrim($caminho, '/');
+
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => PONTE_TIMEOUT,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS      => 3,
+        CURLOPT_HTTPHEADER     => [
+            'Accept: application/json',
+            'ngrok-skip-browser-warning: true',
+        ],
+    ]);
+    $body  = curl_exec($ch);
+    $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $erro  = curl_error($ch);
+    curl_close($ch);
+
+    return [$body, $code, $erro];
+}
