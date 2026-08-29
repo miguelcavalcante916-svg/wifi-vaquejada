@@ -358,7 +358,7 @@ $maxIdx = array_search($gMax, array_column($GRAFICO, 1));
     <title>Painel — <?= htmlspecialchars($AGENCIA['nome']) ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@500;600;700;800&family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/dash.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%234361ee'/><text x='50' y='68' font-size='58' text-anchor='middle' fill='%23f2f5fc' font-family='Arial' font-weight='bold'>C</text></svg>">
