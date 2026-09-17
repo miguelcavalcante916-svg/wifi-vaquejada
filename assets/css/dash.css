@@ -86,7 +86,7 @@
     display: flex; flex-direction: column; gap: 2px;
 }
 .stat__icon { font-size: 1.3rem; margin-bottom: 6px; }
-.stat__num { font-family: var(--font-head); font-size: 1.9rem; font-weight: 800; color: var(--text); }
+.stat__num { font-family: var(--font-head); font-size: 1.9rem; font-weight: 700; color: var(--text); }
 .stat__label { color: var(--muted-2); font-size: .84rem; }
 
 /* Gráfico (barras) — texto em tokens de texto; cor da série só nas marcas */
@@ -101,7 +101,7 @@
 
 /* Créditos */
 .credit { display: flex; flex-direction: column; gap: 6px; }
-.credit__num { font-family: var(--font-head); font-size: 2.1rem; font-weight: 800; }
+.credit__num { font-family: var(--font-head); font-size: 2.1rem; font-weight: 700; }
 .credit__of { color: var(--muted-2); font-size: .88rem; }
 .credit__bar {
     height: 10px; border-radius: 999px; overflow: hidden;
